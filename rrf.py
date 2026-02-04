@@ -1469,6 +1469,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           </div>
         </div>
 
+        ${statsSection}
+
         <div class="mt-3" id="${accId}">
           ${carrierSections}
         </div>
