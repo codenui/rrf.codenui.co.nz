@@ -974,16 +974,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       setTimeout(() => map.invalidateSize(), 150);
     }
 
-    function renderRecentList(filtered) {
-      const sorted = [...filtered].sort((a, b) => {
-        const da = parseISO(a.commencementDate);
-        const db = parseISO(b.commencementDate);
-        const ta = da ? da.getTime() : -Infinity;
-        const tb = db ? db.getTime() : -Infinity;
-        return tb - ta;
-      });
-
-      const top = sorted.slice(0, 10);
+    function renderRecentList(items) {
+      const top = items.slice(0, 10);
       recentList.innerHTML = "";
 
       top.forEach((r) => {
@@ -1022,11 +1014,27 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     
     // stash latest grouping so other UI (eg recent list clicks) can open the full group
     let currentGroups = new Map();
+    let latestFilteredSorted = [];
     
     function inMapView(r) {
       if (!r.lat || !r.lon) return false;
       const b = map.getBounds();
       return b.contains([r.lat, r.lon]);
+    }
+
+    function refreshRecentList() {
+      const bounds = map.getBounds();
+      const visible = [];
+
+      for (const r of latestFilteredSorted) {
+        if (!r.lat || !r.lon) continue;
+        if (bounds.contains([r.lat, r.lon])) {
+          visible.push(r);
+          if (visible.length >= 10) break;
+        }
+      }
+
+      renderRecentList(visible);
     }
 
     function refresh() {
@@ -1058,8 +1066,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       }
       */
 
-      const visible = filtered.filter(r => inMapView(r));
-      renderRecentList(visible);
+      latestFilteredSorted = [...filtered].sort((a, b) => {
+        const da = parseISO(a.commencementDate);
+        const db = parseISO(b.commencementDate);
+        const ta = da ? da.getTime() : -Infinity;
+        const tb = db ? db.getTime() : -Infinity;
+        return tb - ta;
+      });
+      refreshRecentList();
 
       // group markers by carrier + coordinate so one marker can represent multiple licences
       markersLayer.clearLayers();
@@ -1114,6 +1128,10 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         map.fitBounds(b.pad(0.2));
       }
     }
+
+    map.on("moveend", () => {
+      refreshRecentList();
+    });
 
     // Clear detail button in header
     document.getElementById("clearDetail")?.addEventListener("click", () => renderDetailSelection(null));
