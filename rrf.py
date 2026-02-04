@@ -518,10 +518,12 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     // Map init
     const map = L.map("map", { preferCanvas: true });
-    const markerRenderer = L.canvas({ padding: 0.5 });
+    const markerPane = map.createPane("rrfMarkers");
+    markerPane.style.zIndex = 450;
+    const markerRenderer = L.canvas({ padding: 0.5, pane: "rrfMarkers" });
     const addressLinePane = map.createPane("addressLines");
     addressLinePane.style.pointerEvents = "none";
-    addressLinePane.style.zIndex = 400;
+    addressLinePane.style.zIndex = 300;
     const baseLayers = {
       "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -726,6 +728,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       if (latLon) {
         zoomToAddress(latLon.lat, latLon.lon);
         drawNearestCarrierLines(latLon.lat, latLon.lon);
+        closeFiltersIfMobile();
         return;
       }
 
@@ -747,6 +750,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         }
         zoomToAddress(lat, lon);
         drawNearestCarrierLines(lat, lon);
+        closeFiltersIfMobile();
       } catch (err) {
       }
     }
@@ -801,11 +805,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               color: "#0d6efd",
               fillColor: "#0d6efd",
               fillOpacity: 0.7,
-              weight: 2
+              weight: 2,
+              pane: "rrfMarkers",
+              renderer: markerRenderer
             }).addTo(map);
           }
           map.setView([latitude, longitude], 12);
           drawNearestCarrierLines(latitude, longitude);
+          closeFiltersIfMobile();
         },
         (error) => {
           window.alert(`Unable to fetch your location: ${error.message}`);
