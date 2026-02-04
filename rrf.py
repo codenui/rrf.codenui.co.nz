@@ -1022,11 +1022,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     
     // stash latest grouping so other UI (eg recent list clicks) can open the full group
     let currentGroups = new Map();
+    let latestFiltered = [];
     
     function inMapView(r) {
       if (!r.lat || !r.lon) return false;
       const b = map.getBounds();
       return b.contains([r.lat, r.lon]);
+    }
+
+    function refreshRecentList() {
+      const visible = latestFiltered.filter(r => inMapView(r));
+      renderRecentList(visible);
     }
 
     function refresh() {
@@ -1058,8 +1064,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       }
       */
 
-      const visible = filtered.filter(r => inMapView(r));
-      renderRecentList(visible);
+      latestFiltered = filtered;
+      refreshRecentList();
 
       // group markers by carrier + coordinate so one marker can represent multiple licences
       markersLayer.clearLayers();
@@ -1114,6 +1120,10 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         map.fitBounds(b.pad(0.2));
       }
     }
+
+    map.on("moveend", () => {
+      refreshRecentList();
+    });
 
     // Clear detail button in header
     document.getElementById("clearDetail")?.addEventListener("click", () => renderDetailSelection(null));
