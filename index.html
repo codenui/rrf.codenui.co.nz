@@ -929,13 +929,21 @@
       const count = sortedItems.length;
       const carrierCount = carrierGroups.length;
       const nearbySuffix = carrierCount > 1 ? " (nearby carriers within 50m)" : "";
-      const carrierSummary = carrierGroups
-        .map((group) => {
-          const label = safe(group.carrierFriendly || group.carrierKey || "Unknown");
-          return `<span class="badge text-bg-light">${label} · ${group.items.length} licence(s)</span>`;
-        })
-        .join("");
-      const headerLabel = carrierCount > 1 ? "Site" : safe(first.carrierFriendly);
+      const carrierNames = carrierGroups
+        .map((group) => safe(group.carrierFriendly || group.carrierKey || "Unknown"))
+        .join(", ");
+      const carrierSummary = carrierCount > 1
+        ? `<div class="fw-semibold">${carrierNames}</div>`
+        : "";
+      const headerLabel = safe(first.carrierFriendly);
+      const headerBadge = carrierCount > 1
+        ? ""
+        : `
+          <div class="rounded-4 p-2 text-white"
+               style="background:${safe(first.carrierColor)}; height:44px; display:flex; align-items:center; justify-content:center;">
+            <span class="fw-bold" style="text-align:center;">${headerLabel}</span>
+          </div>
+        `;
 
       const accId = `acc_${safe(first.carrierKey)}_${Number(sel.lat ?? first.lat).toFixed(6)}_${Number(sel.lon ?? first.lon).toFixed(6)}`
         .replace(/[^a-zA-Z0-9_]/g, "_");
@@ -1054,16 +1062,12 @@
         <div class="card border-0 shadow-sm">
           <div class="card-body">
             <div class="d-flex align-items-start gap-3">
-              <div class="rounded-4 p-2 text-white"
-                   style="background:${safe(first.carrierColor)}; height:44px; display:flex; align-items:center; justify-content:center;">
-                <span class="fw-bold" style="text-align:center;">${headerLabel}</span>
-              </div>
-
+              ${headerBadge}
               <div class="flex-grow-1">
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                   ${carrierSummary}
                 </div>
-                <div class="fw-semibold fs-6 mt-2">${siteLabel}${nearbySuffix}</div>
+                <div class="fw-semibold fs-6 ${carrierCount > 1 ? "mt-1" : "mt-2"}">${siteLabel}${nearbySuffix}</div>
               </div>
             </div>
 
