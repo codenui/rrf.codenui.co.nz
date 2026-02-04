@@ -371,6 +371,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     #addressSuggestions {
       z-index: 1050;
     }
+
+    .distance-label.leaflet-tooltip {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      border-radius: 999px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      color: #111;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 8px;
+    }
   </style>
 </head>
 <body class="bg-body-tertiary">
@@ -589,10 +600,19 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       addressLineLayer.clearLayers();
     }
 
+    function formatDistanceLabel(meters) {
+      if (!Number.isFinite(meters)) return "";
+      if (meters < 1000) return `${Math.round(meters)} m`;
+      const km = meters / 1000;
+      const rounded = km >= 100 ? Math.round(km) : Math.round(km * 10) / 10;
+      return `${rounded} km`;
+    }
+
     function drawNearestCarrierLines(lat, lon) {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
       clearAddressLines();
       const start = L.latLng(lat, lon);
+      const linePoints = [start];
 
       const primaryCarriers = ["2degrees", "one", "spark"];
 
@@ -627,7 +647,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         const best = rcgNearest.record;
         const color = best.carrierColor || (CARRIERS.rcg?.color ?? "#666666");
         const end = L.latLng(best.lat, best.lon);
-        L.polyline([start, end], {
+        const line = L.polyline([start, end], {
           color,
           weight: 3,
           opacity: 0.9,
@@ -635,6 +655,19 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           interactive: false,
           pane: "addressLines"
         }).addTo(addressLineLayer);
+        const label = formatDistanceLabel(start.distanceTo(end));
+        if (label) {
+          line.bindTooltip(label, {
+            permanent: true,
+            direction: "center",
+            className: "distance-label",
+            opacity: 0.95
+          });
+        }
+        linePoints.push(end);
+        if (linePoints.length > 1) {
+          map.fitBounds(L.latLngBounds(linePoints).pad(0.2), { maxZoom: 15 });
+        }
         return;
       }
 
@@ -642,7 +675,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         const best = result.record;
         const color = best.carrierColor || (CARRIERS[key]?.color ?? "#666666");
         const end = L.latLng(best.lat, best.lon);
-        L.polyline([start, end], {
+        const line = L.polyline([start, end], {
           color,
           weight: 3,
           opacity: 0.9,
@@ -650,7 +683,21 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           interactive: false,
           pane: "addressLines"
         }).addTo(addressLineLayer);
+        const label = formatDistanceLabel(start.distanceTo(end));
+        if (label) {
+          line.bindTooltip(label, {
+            permanent: true,
+            direction: "center",
+            className: "distance-label",
+            opacity: 0.95
+          });
+        }
+        linePoints.push(end);
       });
+
+      if (linePoints.length > 1) {
+        map.fitBounds(L.latLngBounds(linePoints).pad(0.2), { maxZoom: 15 });
+      }
     }
 
     function hideAddressSuggestions() {
