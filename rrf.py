@@ -356,6 +356,15 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     .map-style-control select {
       min-width: 160px;
     }
+
+    #regionSection {
+      position: relative;
+      z-index: 2;
+    }
+
+    #addressSuggestions {
+      z-index: 1050;
+    }
   </style>
 </head>
 <body class="bg-body-tertiary">
