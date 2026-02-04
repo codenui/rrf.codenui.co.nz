@@ -1168,11 +1168,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         `
         : "";
 
-      function renderRow(r, idx, autoOpen) {
+      function renderRow(r, idx, autoOpen, groupId) {
         const rid = safe(r.id);
         const href = `https://rrf.rsm.govt.nz/ui/licence/spectrum/view/${rid}`;
-        const headId = `${accId}_h_${idx}`;
-        const bodyId = `${accId}_b_${idx}`;
+        const headId = `${groupId}_h_${idx}`;
+        const bodyId = `${groupId}_b_${idx}`;
 
         const compact = `
           <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -1212,7 +1212,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               </button>
             </h2>
             <div id="${bodyId}" class="${collapseClass}"
-                 aria-labelledby="${headId}" ${count > 1 ? `data-bs-parent="#${accId}"` : ""}>
+                 aria-labelledby="${headId}" ${count > 1 ? `data-bs-parent="#${groupId}"` : ""}>
               <div class="accordion-body">
                 ${expanded}
               </div>
@@ -1234,7 +1234,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         const groupAccId = `${accId}_g_${groupIndex}`.replace(/[^a-zA-Z0-9_]/g, "_");
         const groupSiteLabel = safe(groupItems[0]?.location) || "Site";
         const rows = groupItems
-          .map((r, i) => renderRow(r, i, count === 1))
+          .map((r, i) => renderRow(r, i, count === 1, groupAccId))
           .join("");
         return `
           <div class="mb-3">
