@@ -1304,7 +1304,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
           renderDetailSelection(sel);
           openFiltersIfMobile();
-          if (r.lat && r.lon) map.setView([r.lat, r.lon], 12);
+          if (r.lat && r.lon) {
+            map.setView([r.lat, r.lon], map.getZoom());
+          }
         });
 
         recentList.appendChild(div);
