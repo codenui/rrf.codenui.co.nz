@@ -489,7 +489,83 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     map.setView([-41.2, 174.7], 5);
 
     let markersLayer = L.layerGroup().addTo(map);
-    
+    let addressMarker = null;
+
+    function setAddressStatus(message, tone = "muted") {
+      if (!addressSearchStatus) return;
+      addressSearchStatus.textContent = message || "";
+      addressSearchStatus.classList.remove("text-secondary", "text-danger", "text-success");
+      if (tone === "danger") {
+        addressSearchStatus.classList.add("text-danger");
+      } else if (tone === "success") {
+        addressSearchStatus.classList.add("text-success");
+      } else {
+        addressSearchStatus.classList.add("text-secondary");
+      }
+    }
+
+    function zoomToAddress(lat, lon, label) {
+      const coords = [lat, lon];
+      map.setView(coords, 15);
+      if (addressMarker) {
+        addressMarker.remove();
+      }
+      addressMarker = L.marker(coords).addTo(map);
+      addressMarker.bindPopup(label || "Search result").openPopup();
+    }
+
+    function parseLatLon(value) {
+      if (!value) return null;
+      const match = value.trim().match(/^(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)$/);
+      if (!match) return null;
+      const lat = Number(match[1]);
+      const lon = Number(match[2]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+      return { lat, lon };
+    }
+
+    async function handleAddressSearch() {
+      if (!qAddress) return;
+      const query = qAddress.value.trim();
+      if (!query) {
+        setAddressStatus("Enter an address to search.", "danger");
+        return;
+      }
+
+      const latLon = parseLatLon(query);
+      if (latLon) {
+        zoomToAddress(latLon.lat, latLon.lon, "Coordinates");
+        setAddressStatus(`Zoomed to ${latLon.lat.toFixed(5)}, ${latLon.lon.toFixed(5)}.`, "success");
+        return;
+      }
+
+      setAddressStatus("Searching…");
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+        const response = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!response.ok) {
+          throw new Error("Unable to reach search service.");
+        }
+        const results = await response.json();
+        if (!results || results.length === 0) {
+          setAddressStatus("No results found. Try a more specific address.", "danger");
+          return;
+        }
+        const best = results[0];
+        const lat = Number(best.lat);
+        const lon = Number(best.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          setAddressStatus("Search result did not include usable coordinates.", "danger");
+          return;
+        }
+        zoomToAddress(lat, lon, best.display_name || "Search result");
+        setAddressStatus(`Zoomed to ${best.display_name || query}.`, "success");
+      } catch (err) {
+        setAddressStatus(err?.message || "Search failed. Please try again.", "danger");
+      }
+    }
+
     function updateNavHeight() {
       const bar = document.getElementById("topbar");
       const h = bar ? bar.offsetHeight : 0;
@@ -504,6 +580,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     // UI refs
     const qDistrict = document.getElementById("qDistrict");
     const qLocation = document.getElementById("qLocation");
+    const qAddress = document.getElementById("qAddress");
     const qCommFrom = document.getElementById("qCommFrom");
     const qCommTo = document.getElementById("qCommTo");
     const qExpFrom = document.getElementById("qExpFrom");
@@ -517,6 +594,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
+    const addressSearchBtn = document.getElementById("addressSearchBtn");
+    const addressSearchStatus = document.getElementById("addressSearchStatus");
     
     // District dropdown options
     function populateDistricts() {
@@ -534,6 +613,20 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       });
     }
     populateDistricts();
+
+    if (addressSearchBtn) {
+      addressSearchBtn.addEventListener("click", () => {
+        handleAddressSearch();
+      });
+    }
+    if (qAddress) {
+      qAddress.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          handleAddressSearch();
+        }
+      });
+    }
 
     // -------------------------------------------------------------------------
     // Carriers: "show all by default"
@@ -1162,6 +1255,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         <div class="col-12">
           <label class="form-label fw-semibold" for="qLocation">Location</label>
           <input class="form-control" id="qLocation" type="text" placeholder="e.g. NAPIER, SYDENHAM…" />
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold" for="qAddress">Address search</label>
+          <div class="input-group">
+            <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" />
+            <button class="btn btn-outline-primary" id="addressSearchBtn" type="button">Go</button>
+          </div>
+          <div class="form-text text-secondary" id="addressSearchStatus"></div>
         </div>
       </div>
     </div>
