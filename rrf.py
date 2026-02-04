@@ -356,6 +356,15 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     .map-style-control select {
       min-width: 160px;
     }
+
+    #regionSection {
+      position: relative;
+      z-index: 2;
+    }
+
+    #addressSuggestions {
+      z-index: 1050;
+    }
   </style>
 </head>
 <body class="bg-body-tertiary">
@@ -504,16 +513,16 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     // Map init
     const map = L.map("map");
     const baseLayers = {
-      Terrain: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
-        maxZoom: 17,
-        attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
-      }),
-      Streets: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
+      }),
+      "Topographic": L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+        maxZoom: 17,
+        attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
       })
     };
-    baseLayers.Terrain.addTo(map);
+    baseLayers.OpenStreetMap.addTo(map);
     map.setView([-41.2, 174.7], 5);
 
     const MapStyleControl = L.Control.extend({
@@ -534,7 +543,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     const mapStyleSelect = document.getElementById("mapStyleSelect");
     if (mapStyleSelect) {
-      mapStyleSelect.value = "Terrain";
+      mapStyleSelect.value = "OpenStreetMap";
       mapStyleSelect.addEventListener("change", (event) => {
         const selected = event.target.value;
         Object.entries(baseLayers).forEach(([name, layer]) => {
@@ -549,23 +558,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
 
     let markersLayer = L.layerGroup().addTo(map);
+    let addressLineLayer = L.layerGroup().addTo(map);
     let addressMarker = null;
     let addressSuggestTimer = null;
     let addressSuggestController = null;
     let addressSuggestionsCache = [];
-
-    function setAddressStatus(message, tone = "muted") {
-      if (!addressSearchStatus) return;
-      addressSearchStatus.textContent = message || "";
-      addressSearchStatus.classList.remove("text-secondary", "text-danger", "text-success");
-      if (tone === "danger") {
-        addressSearchStatus.classList.add("text-danger");
-      } else if (tone === "success") {
-        addressSearchStatus.classList.add("text-success");
-      } else {
-        addressSearchStatus.classList.add("text-secondary");
-      }
-    }
 
     function zoomToAddress(lat, lon) {
       const coords = [lat, lon];
@@ -574,6 +571,42 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         addressMarker.remove();
       }
       addressMarker = L.marker(coords).addTo(map);
+    }
+
+    function clearAddressLines() {
+      addressLineLayer.clearLayers();
+    }
+
+    function drawNearestCarrierLines(lat, lon) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      clearAddressLines();
+      const carriers = ["2degrees", "one", "spark"];
+      const start = L.latLng(lat, lon);
+
+      carriers.forEach((carrierKey) => {
+        let best = null;
+        let bestDist = Infinity;
+        latestFiltered
+          .filter(r => r.lat && r.lon && r.carrierKey === carrierKey)
+          .forEach(r => {
+            const dLat = r.lat - lat;
+            const dLon = r.lon - lon;
+            const dist = (dLat * dLat) + (dLon * dLon);
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = r;
+            }
+          });
+        if (!best) return;
+        const color = best.carrierColor || (CARRIERS[carrierKey]?.color ?? "#666666");
+        const end = L.latLng(best.lat, best.lon);
+        L.polyline([start, end], {
+          color,
+          weight: 3,
+          opacity: 0.9,
+          dashArray: "4 6"
+        }).addTo(addressLineLayer);
+      });
     }
 
     function hideAddressSuggestions() {
@@ -634,18 +667,15 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       hideAddressSuggestions();
       const query = qAddress.value.trim();
       if (!query) {
-        setAddressStatus("Enter an address to search.", "danger");
         return;
       }
 
       const latLon = parseLatLon(query);
       if (latLon) {
         zoomToAddress(latLon.lat, latLon.lon);
-        setAddressStatus(`Zoomed to ${latLon.lat.toFixed(5)}, ${latLon.lon.toFixed(5)}.`, "success");
         return;
       }
 
-      setAddressStatus("Searching…");
       try {
         const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
         const response = await fetch(url, { headers: { Accept: "application/json" } });
@@ -654,20 +684,16 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         }
         const results = await response.json();
         if (!results || results.length === 0) {
-          setAddressStatus("No results found. Try a more specific address.", "danger");
           return;
         }
         const best = results[0];
         const lat = Number(best.lat);
         const lon = Number(best.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          setAddressStatus("Search result did not include usable coordinates.", "danger");
           return;
         }
         zoomToAddress(lat, lon);
-        setAddressStatus(`Zoomed to ${best.display_name || query}.`, "success");
       } catch (err) {
-        setAddressStatus(err?.message || "Search failed. Please try again.", "danger");
       }
     }
 
@@ -702,8 +728,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
-    const addressSearchBtn = document.getElementById("addressSearchBtn");
-    const addressSearchStatus = document.getElementById("addressSearchStatus");
     const geoLocateBtn = document.getElementById("geoLocateBtn");
 
     function geolocateUser() {
@@ -760,11 +784,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
     populateDistricts();
 
-    if (addressSearchBtn) {
-      addressSearchBtn.addEventListener("click", () => {
-        handleAddressSearch();
-      });
-    }
     if (qAddress) {
       qAddress.addEventListener("keydown", event => {
         if (event.key === "Enter") {
@@ -773,6 +792,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         }
       });
       qAddress.addEventListener("input", () => {
+        clearAddressLines();
         const query = qAddress.value.trim();
         if (addressSuggestTimer) {
           clearTimeout(addressSuggestTimer);
@@ -806,13 +826,12 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         const lat = Number(result.lat);
         const lon = Number(result.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          setAddressStatus("Search result did not include usable coordinates.", "danger");
           return;
         }
         qAddress.value = result.display_name || qAddress.value;
         hideAddressSuggestions();
         zoomToAddress(lat, lon);
-        setAddressStatus(`Zoomed to ${result.display_name || qAddress.value}.`, "success");
+        drawNearestCarrierLines(lat, lon);
       });
     }
 
@@ -915,7 +934,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             else carrierSelected.add(key);
           }
           syncCarrierButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         return btn;
@@ -991,7 +1010,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           }
 
           syncBandButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         bandBtns.appendChild(btn);
@@ -1346,7 +1365,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       renderRecentList(visible);
     }
 
-    function refresh() {
+    function refresh({ preserveView = false } = {}) {
+      clearAddressLines();
       const f = getFilters();
 
       // Apply ONLY non-carrier/non-band filters first
@@ -1417,7 +1437,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           fillColor: color,
           fillOpacity: 1,
           opacity: 1,
-          weight: 2.5
+          weight: 3
         });
         m.on("click", () => {
           // consolidated view always; single auto-expands inside renderDetailSelection
@@ -1427,7 +1447,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         m.addTo(markersLayer);
       });
 
-      if (withCoords.length > 0 && withCoords.length < 2000) {
+      if (!preserveView && withCoords.length > 0 && withCoords.length < 2000) {
         const b = L.latLngBounds(withCoords.map(r => [r.lat, r.lon]));
         map.fitBounds(b.pad(0.2));
       }
@@ -1493,12 +1513,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         </div>
         <div class="col-12 position-relative">
           <label class="form-label fw-semibold" for="qAddress">Address search</label>
-          <div class="input-group">
-            <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
-            <button class="btn btn-outline-primary" id="addressSearchBtn" type="button">Go</button>
-          </div>
+          <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
           <div class="list-group position-absolute w-100 shadow-sm d-none" id="addressSuggestions"></div>
-          <div class="form-text text-secondary" id="addressSearchStatus"></div>
         </div>
       </div>
     </div>
