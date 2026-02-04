@@ -626,7 +626,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           color,
           weight: 3,
           opacity: 0.9,
-          dashArray: "4 6"
+          dashArray: "4 6",
+          interactive: false
         }).addTo(addressLineLayer);
         return;
       }
@@ -639,7 +640,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           color,
           weight: 3,
           opacity: 0.9,
-          dashArray: "4 6"
+          dashArray: "4 6",
+          interactive: false
         }).addTo(addressLineLayer);
       });
     }
