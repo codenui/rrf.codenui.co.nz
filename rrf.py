@@ -346,6 +346,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     */
 
     .card { border-radius: unset; }
+
+    .map-style-control {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 0.25rem;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      padding: 0.5rem;
+    }
+
+    .map-style-control select {
+      min-width: 160px;
+    }
   </style>
 </head>
 <body class="bg-body-tertiary">
@@ -485,11 +496,50 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     // Map init
     const map = L.map("map");
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
+    const baseLayers = {
+      Terrain: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+        maxZoom: 17,
+        attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
+      }),
+      Streets: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      })
+    };
+    baseLayers.Terrain.addTo(map);
     map.setView([-41.2, 174.7], 5);
+
+    const MapStyleControl = L.Control.extend({
+      onAdd() {
+        const div = L.DomUtil.create("div", "map-style-control");
+        div.innerHTML = `
+          <label class="form-label fw-semibold mb-1" for="mapStyleSelect">Map style</label>
+          <select id="mapStyleSelect" class="form-select form-select-sm">
+            ${Object.keys(baseLayers).map(name => `<option value="${name}">${name}</option>`).join("")}
+          </select>
+        `;
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      }
+    });
+    const mapStyleControl = new MapStyleControl({ position: "topright" });
+    map.addControl(mapStyleControl);
+
+    const mapStyleSelect = document.getElementById("mapStyleSelect");
+    if (mapStyleSelect) {
+      mapStyleSelect.value = "Terrain";
+      mapStyleSelect.addEventListener("change", (event) => {
+        const selected = event.target.value;
+        Object.entries(baseLayers).forEach(([name, layer]) => {
+          if (map.hasLayer(layer)) {
+            map.removeLayer(layer);
+          }
+          if (name === selected) {
+            layer.addTo(map);
+          }
+        });
+      });
+    }
 
     let markersLayer = L.layerGroup().addTo(map);
     let addressMarker = null;
