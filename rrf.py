@@ -550,6 +550,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     let markersLayer = L.layerGroup().addTo(map);
     let addressMarker = null;
+    let addressSuggestTimer = null;
+    let addressSuggestController = null;
+    let addressSuggestionsCache = [];
 
     function setAddressStatus(message, tone = "muted") {
       if (!addressSearchStatus) return;
@@ -564,14 +567,55 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       }
     }
 
-    function zoomToAddress(lat, lon, label) {
+    function zoomToAddress(lat, lon) {
       const coords = [lat, lon];
       map.setView(coords, 15);
       if (addressMarker) {
         addressMarker.remove();
       }
       addressMarker = L.marker(coords).addTo(map);
-      addressMarker.bindPopup(label || "Search result").openPopup();
+    }
+
+    function hideAddressSuggestions() {
+      if (!addressSuggestions) return;
+      addressSuggestions.classList.add("d-none");
+      addressSuggestions.innerHTML = "";
+      addressSuggestionsCache = [];
+    }
+
+    function renderAddressSuggestions(results) {
+      if (!addressSuggestions) return;
+      addressSuggestions.innerHTML = "";
+      addressSuggestionsCache = results;
+      if (!results.length) {
+        addressSuggestions.classList.add("d-none");
+        return;
+      }
+      results.forEach((result, index) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "list-group-item list-group-item-action";
+        item.textContent = result.display_name;
+        item.dataset.index = String(index);
+        addressSuggestions.appendChild(item);
+      });
+      addressSuggestions.classList.remove("d-none");
+    }
+
+    async function fetchAddressSuggestions(query) {
+      if (addressSuggestController) {
+        addressSuggestController.abort();
+      }
+      addressSuggestController = new AbortController();
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(query)}`;
+      const response = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: addressSuggestController.signal
+      });
+      if (!response.ok) {
+        throw new Error("Unable to reach search service.");
+      }
+      return response.json();
     }
 
     function parseLatLon(value) {
@@ -587,6 +631,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     async function handleAddressSearch() {
       if (!qAddress) return;
+      hideAddressSuggestions();
       const query = qAddress.value.trim();
       if (!query) {
         setAddressStatus("Enter an address to search.", "danger");
@@ -595,7 +640,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
       const latLon = parseLatLon(query);
       if (latLon) {
-        zoomToAddress(latLon.lat, latLon.lon, "Coordinates");
+        zoomToAddress(latLon.lat, latLon.lon);
         setAddressStatus(`Zoomed to ${latLon.lat.toFixed(5)}, ${latLon.lon.toFixed(5)}.`, "success");
         return;
       }
@@ -619,7 +664,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           setAddressStatus("Search result did not include usable coordinates.", "danger");
           return;
         }
-        zoomToAddress(lat, lon, best.display_name || "Search result");
+        zoomToAddress(lat, lon);
         setAddressStatus(`Zoomed to ${best.display_name || query}.`, "success");
       } catch (err) {
         setAddressStatus(err?.message || "Search failed. Please try again.", "danger");
@@ -647,6 +692,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const qCommTo = document.getElementById("qCommTo");
     const qExpFrom = document.getElementById("qExpFrom");
     const qExpTo = document.getElementById("qExpTo");
+    const addressSuggestions = document.getElementById("addressSuggestions");
 
     const carrierBtns = document.getElementById("carrierBtns");
     const bandBtns = document.getElementById("bandBtns");
@@ -725,6 +771,48 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           event.preventDefault();
           handleAddressSearch();
         }
+      });
+      qAddress.addEventListener("input", () => {
+        const query = qAddress.value.trim();
+        if (addressSuggestTimer) {
+          clearTimeout(addressSuggestTimer);
+        }
+        if (query.length < 3) {
+          hideAddressSuggestions();
+          return;
+        }
+        addressSuggestTimer = setTimeout(async () => {
+          try {
+            const results = await fetchAddressSuggestions(query);
+            renderAddressSuggestions(results || []);
+          } catch (err) {
+            if (err?.name === "AbortError") return;
+            hideAddressSuggestions();
+          }
+        }, 250);
+      });
+      qAddress.addEventListener("blur", () => {
+        setTimeout(() => hideAddressSuggestions(), 150);
+      });
+    }
+    if (addressSuggestions) {
+      addressSuggestions.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const index = target.dataset.index;
+        if (index === undefined) return;
+        const result = addressSuggestionsCache[Number(index)];
+        if (!result) return;
+        const lat = Number(result.lat);
+        const lon = Number(result.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          setAddressStatus("Search result did not include usable coordinates.", "danger");
+          return;
+        }
+        qAddress.value = result.display_name || qAddress.value;
+        hideAddressSuggestions();
+        zoomToAddress(lat, lon);
+        setAddressStatus(`Zoomed to ${result.display_name || qAddress.value}.`, "success");
       });
     }
 
@@ -1402,12 +1490,13 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           <label class="form-label fw-semibold" for="qLocation">Location</label>
           <input class="form-control" id="qLocation" type="text" placeholder="e.g. NAPIER, SYDENHAM…" />
         </div>
-        <div class="col-12">
+        <div class="col-12 position-relative">
           <label class="form-label fw-semibold" for="qAddress">Address search</label>
           <div class="input-group">
-            <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" />
+            <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
             <button class="btn btn-outline-primary" id="addressSearchBtn" type="button">Go</button>
           </div>
+          <div class="list-group position-absolute w-100 shadow-sm d-none" id="addressSuggestions"></div>
           <div class="form-text text-secondary" id="addressSearchStatus"></div>
         </div>
       </div>
