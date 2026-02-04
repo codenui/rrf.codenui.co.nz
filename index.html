@@ -698,7 +698,7 @@
             else carrierSelected.add(key);
           }
           syncCarrierButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         return btn;
@@ -774,7 +774,7 @@
           }
 
           syncBandButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         bandBtns.appendChild(btn);
@@ -1129,7 +1129,7 @@
       renderRecentList(visible);
     }
 
-    function refresh() {
+    function refresh({ preserveView = false } = {}) {
       const f = getFilters();
 
       // Apply ONLY non-carrier/non-band filters first
@@ -1209,7 +1209,7 @@
         m.addTo(markersLayer);
       });
 
-      if (withCoords.length > 0 && withCoords.length < 2000) {
+      if (!preserveView && withCoords.length > 0 && withCoords.length < 2000) {
         const b = L.latLngBounds(withCoords.map(r => [r.lat, r.lon]));
         map.fitBounds(b.pad(0.2));
       }

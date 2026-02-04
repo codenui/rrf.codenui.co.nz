@@ -934,7 +934,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             else carrierSelected.add(key);
           }
           syncCarrierButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         return btn;
@@ -1010,7 +1010,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           }
 
           syncBandButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         bandBtns.appendChild(btn);
@@ -1365,7 +1365,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       renderRecentList(visible);
     }
 
-    function refresh() {
+    function refresh({ preserveView = false } = {}) {
       clearAddressLines();
       const f = getFilters();
 
@@ -1446,7 +1446,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         m.addTo(markersLayer);
       });
 
-      if (withCoords.length > 0 && withCoords.length < 2000) {
+      if (!preserveView && withCoords.length > 0 && withCoords.length < 2000) {
         const b = L.latLngBounds(withCoords.map(r => [r.lat, r.lon]));
         map.fitBounds(b.pad(0.2));
       }
