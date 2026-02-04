@@ -558,6 +558,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
 
     let markersLayer = L.layerGroup().addTo(map);
+    let addressLineLayer = L.layerGroup().addTo(map);
     let addressMarker = null;
     let addressSuggestTimer = null;
     let addressSuggestController = null;
@@ -570,6 +571,48 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         addressMarker.remove();
       }
       addressMarker = L.marker(coords).addTo(map);
+    }
+
+    function clearAddressLines() {
+      addressLineLayer.clearLayers();
+    }
+
+    function drawNearestCarrierLines(lat, lon) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      clearAddressLines();
+      const carriers = ["2degrees", "one", "spark"];
+      const start = L.latLng(lat, lon);
+      const bounds = L.latLngBounds([start]);
+
+      carriers.forEach((carrierKey) => {
+        let best = null;
+        let bestDist = Infinity;
+        latestFiltered
+          .filter(r => r.lat && r.lon && r.carrierKey === carrierKey)
+          .forEach(r => {
+            const dLat = r.lat - lat;
+            const dLon = r.lon - lon;
+            const dist = (dLat * dLat) + (dLon * dLon);
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = r;
+            }
+          });
+        if (!best) return;
+        const color = best.carrierColor || (CARRIERS[carrierKey]?.color ?? "#666666");
+        const end = L.latLng(best.lat, best.lon);
+        bounds.extend(end);
+        L.polyline([start, end], {
+          color,
+          weight: 3,
+          opacity: 0.9,
+          dashArray: "4 6"
+        }).addTo(addressLineLayer);
+      });
+
+      if (bounds.isValid()) {
+        map.fitBounds(bounds.pad(0.2));
+      }
     }
 
     function hideAddressSuggestions() {
@@ -636,6 +679,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       const latLon = parseLatLon(query);
       if (latLon) {
         zoomToAddress(latLon.lat, latLon.lon);
+        drawNearestCarrierLines(latLon.lat, latLon.lon);
         return;
       }
 
@@ -656,6 +700,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           return;
         }
         zoomToAddress(lat, lon);
+        drawNearestCarrierLines(lat, lon);
       } catch (err) {
       }
     }
@@ -755,6 +800,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         }
       });
       qAddress.addEventListener("input", () => {
+        clearAddressLines();
         const query = qAddress.value.trim();
         if (addressSuggestTimer) {
           clearTimeout(addressSuggestTimer);
@@ -793,6 +839,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         qAddress.value = result.display_name || qAddress.value;
         hideAddressSuggestions();
         zoomToAddress(lat, lon);
+        drawNearestCarrierLines(lat, lon);
       });
     }
 
@@ -1327,6 +1374,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
 
     function refresh() {
+      clearAddressLines();
       const f = getFilters();
 
       // Apply ONLY non-carrier/non-band filters first
