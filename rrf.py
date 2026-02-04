@@ -18,7 +18,7 @@ Fetch + rebuild JSON/HTML (explicit, since HTML-only is default):
 
 Outputs:
   ./rrf_licences.json
-  ./rrf_map.html
+  ./index.html
 """
 
 from __future__ import annotations
@@ -2009,8 +2009,8 @@ def main() -> int:
     )
     ap.add_argument(
         "--html-out",
-        default="rrf_map.html",
-        help="HTML output path (default: ./rrf_map.html)",
+        default="index.html",
+        help="HTML output path (default: ./index.html)",
     )
     ap.add_argument(
         "--json-out",

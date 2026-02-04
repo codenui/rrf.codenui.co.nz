@@ -58,11 +58,6 @@ jobs:
         run: |
           python rrf.py ${{ steps.mode.outputs.args }}
 
-          # If your script outputs rrf_map.html, publish it as index.html
-          if [ -f rrf_map.html ]; then
-            mv -f rrf_map.html index.html
-          fi
-
           # sanity checks
           test -s index.html
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
