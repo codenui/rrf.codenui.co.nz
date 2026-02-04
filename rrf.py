@@ -526,6 +526,12 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     function safe(v) {
       return (v === null || v === undefined) ? "" : String(v);
     }
+    function formatMHz(value) {
+      if (!Number.isFinite(value)) return "—";
+      const rounded = Math.round(value * 10) / 10;
+      const display = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
+      return `${display} MHz`;
+    }
 
     // Map init
     const map = L.map("map", { preferCanvas: true });
@@ -1298,6 +1304,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         });
         const groupAccId = `${accId}_g_${groupIndex}`.replace(/[^a-zA-Z0-9_]/g, "_");
         const groupSiteLabel = safe(groupItems[0]?.location) || "Site";
+        const totalBandwidthMHz = groupItems.reduce((sum, item) => {
+          const bw = Number(item.bandwidthMHz);
+          return Number.isFinite(bw) ? sum + bw : sum;
+        }, 0);
+        const totalBandwidthLabel = formatMHz(totalBandwidthMHz);
         const rows = groupItems
           .map((r, i) => renderRow(r, i, count === 1, groupAccId))
           .join("");
@@ -1306,9 +1317,12 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="swatch-dot" style="background:${safe(group.carrierColor || "#666")}"></span>
               <div class="fw-semibold">${safe(group.carrierFriendly || group.carrierKey || "Unknown")}</div>
+              <span class="ms-auto badge text-bg-light">${totalBandwidthLabel} total</span>
+            </div>
+            <div class="d-flex align-items-center text-secondary small mb-2">
+              <div class="text-truncate">${groupSiteLabel}${nearbySuffix}</div>
               <span class="ms-auto badge text-bg-light">${groupItems.length} licence(s)</span>
             </div>
-            <div class="text-secondary small mb-2">${groupSiteLabel}${nearbySuffix}</div>
             <div class="accordion" id="${groupAccId}">
               ${rows}
             </div>
