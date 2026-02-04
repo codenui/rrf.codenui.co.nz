@@ -6,9 +6,6 @@ Requirements:
 Optional (recommended for TM2000 -> lat/lon conversion):
   pip install pyproj
 
-Auth:
-  export RRF_TOKEN="YOUR_BEARER_TOKEN"
-
 Run:
   python rrf_map.py --page-size 200 --max-pages 50
 
@@ -87,7 +84,7 @@ def carrier_key_from_licensee(licensee: Optional[str]) -> str:
 # ---- HTTP + pagination -------------------------------------------------------
 
 
-def build_headers(token: str) -> Dict[str, str]:
+def build_headers() -> Dict[str, str]:
     return {
         "Content-Type": "application/json",
         "Accept": "application/json, text/plain, */*",
@@ -127,7 +124,7 @@ def fetch_all(
     sleep_between: float = 0.0,
 ) -> List[Dict[str, Any]]:
     session = requests.Session()
-    headers = build_headers(token)
+    headers = build_headers()
 
     payload = dict(base_payload)
     payload["pageSize"] = page_size
