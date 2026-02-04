@@ -5,6 +5,8 @@ on:
     # GitHub cron is UTC. Adjust as desired.
     - cron: "10 14 * * *"
   workflow_dispatch: {}
+  pull_request:
+    types: [closed]
 
 permissions:
   contents: write
@@ -15,6 +17,10 @@ concurrency:
 
 jobs:
   build:
+    # Run for schedule/manual always, and for PR-closed only if it was merged into main
+    if: |
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
 
     steps:
@@ -34,9 +40,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pyproj
 
+      - name: Determine build mode
+        id: mode
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "args=--html-only" >> "$GITHUB_OUTPUT"
+            echo "stage=index.html" >> "$GITHUB_OUTPUT"
+            echo "msg=Rebuild HTML (post-merge)" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=--page-size 5000 --max-pages 50" >> "$GITHUB_OUTPUT"
+            echo "stage=index.html rrf_licences.json" >> "$GITHUB_OUTPUT"
+            echo "msg=Update RRF outputs (daily)" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run rrf.py
         run: |
-          python rrf.py --page-size 5000 --max-pages 50
+          python rrf.py ${{ steps.mode.outputs.args }}
 
           # If your script outputs rrf_map.html, publish it as index.html
           if [ -f rrf_map.html ]; then
@@ -45,24 +65,27 @@ jobs:
 
           # sanity checks
           test -s index.html
-          test -s rrf_licences.json
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            test -s rrf_licences.json
+          fi
+        shell: bash
 
       - name: Commit & push to main (only if changed)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # ensure we're on main
           git checkout main
 
-          # stage only the outputs you care about
-          git add -A index.html rrf_licences.json
+          # stage only what this run is supposed to update
+          git add -A ${{ steps.mode.outputs.stage }}
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
-          git commit -m "Update RRF outputs (daily)"
+          git commit -m "${{ steps.mode.outputs.msg }}"
           git pull --rebase origin main
           git push origin main
+        shell: bash
