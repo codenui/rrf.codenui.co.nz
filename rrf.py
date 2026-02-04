@@ -778,6 +778,30 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
       const accId = `acc_${safe(first.carrierKey)}_${Number(sel.lat ?? first.lat).toFixed(6)}_${Number(sel.lon ?? first.lon).toFixed(6)}`
         .replace(/[^a-zA-Z0-9_]/g, "_");
+      const lat = Number(sel.lat ?? first.lat);
+      const lon = Number(sel.lon ?? first.lon);
+      const hasCoords = Number.isFinite(lat) && Number.isFinite(lon);
+      const latStr = hasCoords ? lat.toFixed(6) : "";
+      const lonStr = hasCoords ? lon.toFixed(6) : "";
+      const zoomLevel = 17;
+      const googleSatelliteUrl = hasCoords
+        ? `https://www.google.com/maps/@${latStr},${lonStr},${zoomLevel}z/data=!3m1!1e3`
+        : "";
+      const googleStreetUrl = hasCoords
+        ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${latStr},${lonStr}`
+        : "";
+      const linzUrl = hasCoords
+        ? `https://basemaps.linz.govt.nz/@${latStr},${lonStr},z${zoomLevel}?`
+        : "";
+      const linkSection = hasCoords
+        ? `
+          <div class="mt-2 d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-secondary" href="${googleSatelliteUrl}" target="_blank" rel="noreferrer">Google Maps (Satellite)</a>
+            <a class="btn btn-sm btn-outline-secondary" href="${googleStreetUrl}" target="_blank" rel="noreferrer">Google Maps (Street View)</a>
+            <a class="btn btn-sm btn-outline-secondary" href="${linzUrl}" target="_blank" rel="noreferrer">LINZ Basemaps</a>
+          </div>
+        `
+        : "";
 
       function renderRow(r, idx, autoOpen) {
         const rid = safe(r.id);
@@ -861,6 +885,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               <button class="btn btn-sm btn-outline-secondary" id="clearDetailBtn" type="button">Back</button>
               <button class="btn btn-sm btn-dark" id="zoomSiteBtn" type="button" ${first.lat && first.lon ? "" : "disabled"}>Zoom</button>
             </div>
+            ${linkSection}
           </div>
         </div>
 
