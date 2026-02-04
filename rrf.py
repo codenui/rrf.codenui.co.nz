@@ -980,7 +980,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             else carrierSelected.add(key);
           }
           syncCarrierButtons();
-          refresh({ preserveView: true });
+          refreshImmediate({ preserveView: true });
         });
 
         return btn;
@@ -1056,7 +1056,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           }
 
           syncBandButtons();
-          refresh({ preserveView: true });
+          refreshImmediate({ preserveView: true });
         });
 
         bandBtns.appendChild(btn);
@@ -1074,6 +1074,13 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         refreshTimer = null;
         refresh();
       }, 120);
+    }
+    function refreshImmediate({ preserveView = false } = {}) {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+      refresh({ preserveView });
     }
 
      // Filter events
