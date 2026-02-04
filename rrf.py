@@ -290,7 +290,6 @@ def normalise_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def build_html(data: List[Dict[str, Any]]) -> str:
-    data_json = json.dumps(data, ensure_ascii=False)
     bands_json = json.dumps(BAND_DEFS, ensure_ascii=False)
 
     # NOTE: placeholders + replace, so JS `${...}` doesn't conflict with Python.
@@ -400,8 +399,16 @@ def build_html(data: List[Dict[str, Any]]) -> str:
   ></script>
 
   <script>
-    const DATA = __DATA__;
+    const DATA_URL = "https://raw.githubusercontent.com/codenui/rrf.codenui.co.nz/refs/heads/main/rrf_licences.json";
     const BAND_DEFS = __BANDS__; // [code,label,[lo,hi]]
+    let DATA = [];
+
+    async function init() {
+      const response = await fetch(DATA_URL, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`Failed to load data (${response.status}).`);
+      }
+      DATA = await response.json();
 
     // UI-only transforms (do not store in JSON)
     const DISTRICT_NAMES = {
@@ -1296,6 +1303,12 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     renderDetailSelection(null);
     refresh();
+  }
+
+  init().catch(err => {
+    console.error("Failed to initialize page data:", err);
+    window.alert(err?.message || "Failed to load data.");
+  });
   </script>
 </body>
 </html>
@@ -1404,11 +1417,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 </div>
 """
 
-    return (
-        html.replace("__DATA__", data_json)
-        .replace("__BANDS__", bands_json)
-        .replace("__FILTERS__", filters_html)
-    )
+    return html.replace("__BANDS__", bands_json).replace("__FILTERS__", filters_html)
 
 
 # ---- CLI + IO ----------------------------------------------------------------
