@@ -51,6 +51,8 @@
 
     .card { border-radius: unset; }
 
+    .offcanvas-lg .offcanvas-body { display: unset; }
+
     .map-style-control {
       background: rgba(255, 255, 255, 0.95);
       border-radius: 0.25rem;
@@ -423,7 +425,8 @@
           color,
           weight: 3,
           opacity: 0.9,
-          dashArray: "4 6"
+          dashArray: "4 6",
+          interactive: false
         }).addTo(addressLineLayer);
         return;
       }
@@ -436,7 +439,8 @@
           color,
           weight: 3,
           opacity: 0.9,
-          dashArray: "4 6"
+          dashArray: "4 6",
+          interactive: false
         }).addTo(addressLineLayer);
       });
     }
