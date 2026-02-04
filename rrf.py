@@ -9,8 +9,12 @@ Optional (recommended for TM2000 -> lat/lon conversion):
 Run:
   python rrf_map.py --page-size 200 --max-pages 50
 
-HTML-only (no API calls; regenerates ./rrf_licences.html from existing JSON):
+HTML-only (no API calls; regenerates ./rrf_map.html from existing JSON):
+  python rrf_map.py
   python rrf_map.py --html-only
+
+Fetch + rebuild JSON/HTML (explicit, since HTML-only is default):
+  python rrf_map.py --fetch
 
 Outputs:
   ./rrf_licences.json
@@ -1821,11 +1825,17 @@ def main() -> int:
     ap.add_argument("--order-by", default="id desc", help="orderBy")
     ap.add_argument("--suppressed", action="store_true", help="Set suppressed=true (default false)")
 
-    # HTML-only mode
-    ap.add_argument(
+    # HTML-only is the default. Use --fetch to run the API call.
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument(
         "--html-only",
         action="store_true",
-        help="Regenerate HTML from existing JSON (skips API fetch)",
+        help="Regenerate HTML from existing JSON (skips API fetch; default)",
+    )
+    mode.add_argument(
+        "--fetch",
+        action="store_true",
+        help="Fetch API data and regenerate JSON + HTML",
     )
     ap.add_argument(
         "--json-in",
@@ -1845,8 +1855,10 @@ def main() -> int:
 
     args = ap.parse_args()
 
+    html_only = args.html_only or not args.fetch
+
     # HTML-only fast path
-    if args.html_only:
+    if html_only:
         try:
             data = read_json(args.json_in)
         except Exception as e:
