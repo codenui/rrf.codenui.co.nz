@@ -1,8 +1,8 @@
-name: RRF daily build
+name: RRF daily build (commit to main)
 
 on:
   schedule:
-    # Runs daily (UTC). Adjust if you want a different time.
+    # GitHub cron is UTC. Adjust as desired.
     - cron: "10 14 * * *"
   workflow_dispatch: {}
 
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: rrf-daily
+  group: rrf-daily-main
   cancel-in-progress: true
 
 jobs:
@@ -18,8 +18,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,23 +36,27 @@ jobs:
 
       - name: Run rrf.py
         run: |
-          python rrf.py --page-size 5000 --max-pages 15
+          python rrf.py --page-size 200 --max-pages 50
 
-          # If your script outputs rrf_map.html, rename it
+          # If your script outputs rrf_map.html, publish it as index.html
           if [ -f rrf_map.html ]; then
             mv -f rrf_map.html index.html
           fi
 
-          # Basic sanity checks
-          test -s rrf_licences.json
+          # sanity checks
           test -s index.html
+          test -s rrf_licences.json
 
-      - name: Commit and push outputs
+      - name: Commit & push to main (only if changed)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add index.html rrf_licences.json || true
+          # ensure we're on main
+          git checkout main
+
+          # stage only the outputs you care about
+          git add -A index.html rrf_licences.json
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
@@ -57,4 +64,5 @@ jobs:
           fi
 
           git commit -m "Update RRF outputs (daily)"
-          git push
+          git pull --rebase origin main
+          git push origin main
