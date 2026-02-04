@@ -557,6 +557,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
 
     geoLocateBtn?.addEventListener("click", geolocateUser);
+    const carrierSection = document.getElementById("carrierSection");
+    const bandSection = document.getElementById("bandSection");
     
     // District dropdown options
     function populateDistricts() {
@@ -788,19 +790,24 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         detailCard.innerHTML = "Click a marker (or a recent item) to see details.";
         if (recentSection) recentSection.style.display = "";
         if (regionSection) regionSection.style.display = "";
+        if (carrierSection) carrierSection.style.display = "";
+        if (bandSection) bandSection.style.display = "";
         return;
       }
 
       if (recentSection) recentSection.style.display = "none";
       if (regionSection) regionSection.style.display = "none";
+      if (carrierSection) carrierSection.style.display = "none";
+      if (bandSection) bandSection.style.display = "none";
 
-      // stable sorting: commencement desc then licenceNo
+      // stable sorting: frequency asc then licenceNo
       const items = [...sel.items].sort((a, b) => {
-        const da = parseISO(a.commencementDate);
-        const db = parseISO(b.commencementDate);
-        const ta = da ? da.getTime() : -Infinity;
-        const tb = db ? db.getTime() : -Infinity;
-        if (tb !== ta) return tb - ta;
+        const fa = Number(a.refFrequencyMHz);
+        const fb = Number(b.refFrequencyMHz);
+        const hasFa = Number.isFinite(fa);
+        const hasFb = Number.isFinite(fb);
+        if (hasFa && hasFb && fa !== fb) return fa - fb;
+        if (hasFa !== hasFb) return hasFa ? -1 : 1;
         return safe(a.licenceNo).localeCompare(safe(b.licenceNo));
       });
 
@@ -811,6 +818,30 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
       const accId = `acc_${safe(first.carrierKey)}_${Number(sel.lat ?? first.lat).toFixed(6)}_${Number(sel.lon ?? first.lon).toFixed(6)}`
         .replace(/[^a-zA-Z0-9_]/g, "_");
+      const lat = Number(sel.lat ?? first.lat);
+      const lon = Number(sel.lon ?? first.lon);
+      const hasCoords = Number.isFinite(lat) && Number.isFinite(lon);
+      const latStr = hasCoords ? lat.toFixed(6) : "";
+      const lonStr = hasCoords ? lon.toFixed(6) : "";
+      const zoomLevel = 17;
+      const googleSatelliteUrl = hasCoords
+        ? `https://www.google.com/maps/@${latStr},${lonStr},${zoomLevel}z/data=!3m1!1e3`
+        : "";
+      const googleStreetUrl = hasCoords
+        ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${latStr},${lonStr}`
+        : "";
+      const linzUrl = hasCoords
+        ? `https://basemaps.linz.govt.nz/@${latStr},${lonStr},z${zoomLevel}?`
+        : "";
+      const linkSection = hasCoords
+        ? `
+          <div class="mt-2 d-flex flex-wrap gap-2">
+            <a class="btn btn-sm btn-outline-secondary" href="${googleSatelliteUrl}" target="_blank" rel="noreferrer">Google Maps (Satellite)</a>
+            <a class="btn btn-sm btn-outline-secondary" href="${googleStreetUrl}" target="_blank" rel="noreferrer">Google Maps (Street View)</a>
+            <a class="btn btn-sm btn-outline-secondary" href="${linzUrl}" target="_blank" rel="noreferrer">LINZ Basemaps</a>
+          </div>
+        `
+        : "";
 
       function renderRow(r, idx, autoOpen) {
         const rid = safe(r.id);
@@ -894,6 +925,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               <button class="btn btn-sm btn-outline-secondary" id="clearDetailBtn" type="button">Back</button>
               <button class="btn btn-sm btn-dark" id="zoomSiteBtn" type="button" ${first.lat && first.lon ? "" : "disabled"}>Zoom</button>
             </div>
+            ${linkSection}
           </div>
         </div>
 
@@ -1062,11 +1094,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     
     // stash latest grouping so other UI (eg recent list clicks) can open the full group
     let currentGroups = new Map();
+    let latestFiltered = [];
     
     function inMapView(r) {
       if (!r.lat || !r.lon) return false;
       const b = map.getBounds();
       return b.contains([r.lat, r.lon]);
+    }
+
+    function refreshRecentList() {
+      const visible = latestFiltered.filter(r => inMapView(r));
+      renderRecentList(visible);
     }
 
     function refresh() {
@@ -1098,8 +1136,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       }
       */
 
-      const visible = filtered.filter(r => inMapView(r));
-      renderRecentList(visible);
+      latestFiltered = filtered;
+      refreshRecentList();
 
       // group markers by carrier + coordinate so one marker can represent multiple licences
       markersLayer.clearLayers();
@@ -1155,6 +1193,10 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       }
     }
 
+    map.on("moveend", () => {
+      refreshRecentList();
+    });
+
     // Clear detail button in header
     document.getElementById("clearDetail")?.addEventListener("click", () => renderDetailSelection(null));
 
@@ -1176,14 +1218,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="carrierSection">
     <div class="card-body">
       <div class="fw-semibold mb-2">Carriers</div>
       <div class="btn-group gap-2 flex-wrap" role="group" aria-label="Carriers" id="carrierBtns"></div>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="bandSection">
     <div class="card-body">
         <div class="fw-semibold mb-2">Bands</div>
         <div class="btn-group gap-2 flex-wrap" role="group" aria-label="Bands" id="bandBtns"></div>
