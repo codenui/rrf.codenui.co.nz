@@ -1577,6 +1577,126 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       return `${fromLabel} → ${toLabel}`;
     }
 
+    const GRID_REF_LAT = -41.2;
+    const GRID_METERS_PER_DEG_LAT = 111320;
+    const GRID_METERS_PER_DEG_LON = 111320 * Math.cos(GRID_REF_LAT * Math.PI / 180);
+    const CLUSTER_RADIUS_METERS = 50;
+    const GRID_CELL_SIZE = CLUSTER_RADIUS_METERS;
+
+    function latLonToGrid(lat, lon) {
+      return {
+        x: lon * GRID_METERS_PER_DEG_LON,
+        y: lat * GRID_METERS_PER_DEG_LAT
+      };
+    }
+
+    function distanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = Math.PI / 180;
+      const dLat = (lat2 - lat1) * toRad;
+      const dLon = (lon2 - lon1) * toRad;
+      const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    function buildClusters(groupList) {
+      const clusterByGroupKey = new Map();
+      const clusters = [];
+      const groupsByKey = new Map(groupList.map(g => [g.key, g]));
+      const unassigned = new Set(groupList.map(g => g.key));
+      const grid = new Map();
+
+      function cellKey(x, y) {
+        const cx = Math.floor(x / GRID_CELL_SIZE);
+        const cy = Math.floor(y / GRID_CELL_SIZE);
+        return `${cx}|${cy}`;
+      }
+
+      groupList.forEach(group => {
+        const { x, y } = latLonToGrid(group.lat, group.lon);
+        const key = cellKey(x, y);
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(group.key);
+        group._grid = { x, y };
+      });
+
+      function nearbyCandidateKeys(group) {
+        const { x, y } = group._grid;
+        const cx = Math.floor(x / GRID_CELL_SIZE);
+        const cy = Math.floor(y / GRID_CELL_SIZE);
+        const keys = [];
+        for (let dx = -1; dx <= 1; dx += 1) {
+          for (let dy = -1; dy <= 1; dy += 1) {
+            const bucket = grid.get(`${cx + dx}|${cy + dy}`);
+            if (bucket) keys.push(...bucket);
+          }
+        }
+        return keys;
+      }
+
+      while (unassigned.size > 0) {
+        const seedKey = unassigned.values().next().value;
+        const seed = groupsByKey.get(seedKey);
+        if (!seed) {
+          unassigned.delete(seedKey);
+          continue;
+        }
+        const clusterGroups = [];
+        const queue = [seed];
+        unassigned.delete(seedKey);
+
+        while (queue.length) {
+          const current = queue.pop();
+          clusterGroups.push(current);
+          const candidates = nearbyCandidateKeys(current);
+          candidates.forEach(candidateKey => {
+            if (!unassigned.has(candidateKey)) return;
+            const candidate = groupsByKey.get(candidateKey);
+            if (!candidate) return;
+            const d = distanceMeters(current.lat, current.lon, candidate.lat, candidate.lon);
+            if (d <= CLUSTER_RADIUS_METERS) {
+              unassigned.delete(candidateKey);
+              queue.push(candidate);
+            }
+          });
+        }
+
+        const carrierMap = new Map();
+        clusterGroups.forEach(group => {
+          const carrierKey = group.carrierKey || "unknown";
+          if (!carrierMap.has(carrierKey)) {
+            carrierMap.set(carrierKey, {
+              carrierKey,
+              carrierFriendly: group.carrierFriendly,
+              carrierColor: group.carrierColor,
+              items: []
+            });
+          }
+          carrierMap.get(carrierKey).items.push(...group.items);
+        });
+        const carrierGroups = [...carrierMap.values()].sort((a, b) => {
+          const aLabel = safe(a.carrierFriendly || a.carrierKey);
+          const bLabel = safe(b.carrierFriendly || b.carrierKey);
+          return aLabel.localeCompare(bLabel);
+        });
+        const items = clusterGroups.flatMap(group => group.items);
+        const cluster = {
+          groups: clusterGroups,
+          items,
+          carrierGroups
+        };
+        clusterGroups.forEach(group => clusterByGroupKey.set(group.key, cluster));
+        clusters.push(cluster);
+      }
+
+      groupList.forEach(group => {
+        delete group._grid;
+      });
+
+      return { clusters, clusterByGroupKey };
+    }
+
     function renderActiveFilters(filters, districtLabel) {
       if (!activeFilters) return;
       const labels = [];
@@ -1682,72 +1802,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
       const groupList = [...groups.values()];
 
-      function distanceMeters(lat1, lon1, lat2, lon2) {
-        const R = 6371000;
-        const toRad = Math.PI / 180;
-        const dLat = (lat2 - lat1) * toRad;
-        const dLon = (lon2 - lon1) * toRad;
-        const a = Math.sin(dLat / 2) ** 2
-          + Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLon / 2) ** 2;
-        return 2 * R * Math.asin(Math.sqrt(a));
-      }
-
-      const clusterByGroupKey = new Map();
-      const clusters = [];
-      const unassigned = new Set(groupList.map(g => g.key));
-      const groupsByKey = new Map(groupList.map(g => [g.key, g]));
-
-      while (unassigned.size > 0) {
-        const seedKey = unassigned.values().next().value;
-        const seed = groupsByKey.get(seedKey);
-        if (!seed) {
-          unassigned.delete(seedKey);
-          continue;
-        }
-        const clusterGroups = [];
-        const queue = [seed];
-        unassigned.delete(seedKey);
-        while (queue.length) {
-          const current = queue.pop();
-          clusterGroups.push(current);
-          [...unassigned].forEach((candidateKey) => {
-            const candidate = groupsByKey.get(candidateKey);
-            if (!candidate) return;
-            const d = distanceMeters(current.lat, current.lon, candidate.lat, candidate.lon);
-            if (d <= 50) {
-              unassigned.delete(candidateKey);
-              queue.push(candidate);
-            }
-          });
-        }
-        const carrierMap = new Map();
-        clusterGroups.forEach(group => {
-          const carrierKey = group.carrierKey || "unknown";
-          if (!carrierMap.has(carrierKey)) {
-            carrierMap.set(carrierKey, {
-              carrierKey,
-              carrierFriendly: group.carrierFriendly,
-              carrierColor: group.carrierColor,
-              items: []
-            });
-          }
-          carrierMap.get(carrierKey).items.push(...group.items);
-        });
-        const carrierGroups = [...carrierMap.values()].sort((a, b) => {
-          const aLabel = safe(a.carrierFriendly || a.carrierKey);
-          const bLabel = safe(b.carrierFriendly || b.carrierKey);
-          return aLabel.localeCompare(bLabel);
-        });
-        const items = clusterGroups.flatMap(group => group.items);
-        const cluster = {
-          groups: clusterGroups,
-          items,
-          carrierGroups
-        };
-        clusterGroups.forEach(group => clusterByGroupKey.set(group.key, cluster));
-        clusters.push(cluster);
-      }
-
+      const { clusterByGroupKey } = buildClusters(groupList);
       currentClustersByGroupKey = clusterByGroupKey;
 
       groupList.forEach((g) => {
