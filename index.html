@@ -924,11 +924,17 @@
       });
 
       const first = sortedItems[0];
-      const districts = (first.locationDistrictNames || first.locationDistrictCodes || []).join(", ");
       const siteLabel = safe(first.location) || "Site";
       const count = sortedItems.length;
       const carrierCount = carrierGroups.length;
       const nearbySuffix = carrierCount > 1 ? " (nearby carriers within 50m)" : "";
+      const carrierSummary = carrierGroups
+        .map((group) => {
+          const label = safe(group.carrierFriendly || group.carrierKey || "Unknown");
+          return `<span class="badge text-bg-light">${label} · ${group.items.length} licence(s)</span>`;
+        })
+        .join("");
+      const headerLabel = carrierCount > 1 ? "Site" : safe(first.carrierFriendly);
 
       const accId = `acc_${safe(first.carrierKey)}_${Number(sel.lat ?? first.lat).toFixed(6)}_${Number(sel.lon ?? first.lon).toFixed(6)}`
         .replace(/[^a-zA-Z0-9_]/g, "_");
@@ -949,7 +955,7 @@
         : "";
       const linkSection = hasCoords
         ? `
-          <div class="mt-2 d-flex flex-wrap gap-2">
+          <div class="mt-2 d-flex flex-nowrap gap-2 overflow-auto">
             <a class="btn btn-sm btn-outline-secondary" href="${googleSatelliteUrl}" target="_blank" rel="noreferrer">Google Maps (Satellite)</a>
             <a class="btn btn-sm btn-outline-secondary" href="${googleStreetUrl}" target="_blank" rel="noreferrer">Google Maps (Street View)</a>
             <a class="btn btn-sm btn-outline-secondary" href="${linzUrl}" target="_blank" rel="noreferrer">LINZ Basemaps</a>
@@ -977,7 +983,6 @@
             <dt class="col-5 text-secondary">Licence #</dt><dd class="col-7">${safe(r.licenceNo)}</dd>
             <dt class="col-5 text-secondary">Record ID</dt><dd class="col-7"><a href="${href}" target="_blank" rel="noreferrer">${rid}</a></dd>
             <dt class="col-5 text-secondary">Location</dt><dd class="col-7">${safe(r.location)}</dd>
-            <dt class="col-5 text-secondary">District</dt><dd class="col-7">${safe(districts)}</dd>
             <dt class="col-5 text-secondary">Ref (MHz)</dt><dd class="col-7">${safe(r.refFrequencyMHz)}</dd>
             <dt class="col-5 text-secondary">Band</dt><dd class="col-7">${safe(r.bandCode)}</dd>
             <dt class="col-5 text-secondary">Bounds (MHz)</dt><dd class="col-7">${safe(r.lowerBoundMHz)} – ${safe(r.upperBoundMHz)}</dd>
@@ -1050,21 +1055,19 @@
             <div class="d-flex align-items-start gap-3">
               <div class="rounded-4 p-2 text-white"
                    style="background:${safe(first.carrierColor)}; height:44px; display:flex; align-items:center; justify-content:center;">
-                <span class="fw-bold" style="text-align:center;">${carrierCount > 1 ? "Multiple" : safe(first.carrierFriendly)}</span>
+                <span class="fw-bold" style="text-align:center;">${headerLabel}</span>
               </div>
 
               <div class="flex-grow-1">
-                <div class="fw-semibold fs-6 mb-0">${siteLabel}${nearbySuffix}</div>
-                <div class="text-secondary small">${safe(districts)}</div>
-              </div>
-
-              <div class="text-end">
-                <span class="badge text-bg-primary">${count} licence(s)</span>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  ${carrierSummary}
+                </div>
+                <div class="fw-semibold fs-6 mt-2">${siteLabel}${nearbySuffix}</div>
               </div>
             </div>
 
             <div class="mt-3 d-flex gap-2">
-              <button class="btn btn-sm btn-outline-secondary" id="clearDetailBtn" type="button">Back</button>
+              <button class="btn btn-sm btn-primary fw-semibold" id="clearDetailBtn" type="button">Back</button>
               <button class="btn btn-sm btn-dark" id="zoomSiteBtn" type="button" ${first.lat && first.lon ? "" : "disabled"}>Zoom</button>
             </div>
             ${linkSection}
