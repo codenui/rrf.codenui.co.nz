@@ -1160,9 +1160,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       const linkSection = hasCoords
         ? `
           <div class="mt-2 d-flex flex-nowrap gap-2 overflow-auto">
-            <a class="btn btn-sm btn-outline-secondary" href="${googleSatelliteUrl}" target="_blank" rel="noreferrer">Google Maps (Satellite)</a>
-            <a class="btn btn-sm btn-outline-secondary" href="${googleStreetUrl}" target="_blank" rel="noreferrer">Google Maps (Street View)</a>
-            <a class="btn btn-sm btn-outline-secondary" href="${linzUrl}" target="_blank" rel="noreferrer">LINZ Basemaps</a>
+            <a class="btn btn-sm btn-outline-secondary" href="${googleSatelliteUrl}" target="_blank" rel="noreferrer">Satellite</a>
+            <a class="btn btn-sm btn-outline-secondary" href="${googleStreetUrl}" target="_blank" rel="noreferrer">Street</a>
+            <a class="btn btn-sm btn-outline-secondary" href="${linzUrl}" target="_blank" rel="noreferrer">Aerial</a>
           </div>
         `
         : "";
