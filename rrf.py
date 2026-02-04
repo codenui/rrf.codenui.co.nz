@@ -711,7 +711,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
-    const addressSearchBtn = document.getElementById("addressSearchBtn");
     const addressSearchStatus = document.getElementById("addressSearchStatus");
     const geoLocateBtn = document.getElementById("geoLocateBtn");
 
@@ -769,11 +768,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
     populateDistricts();
 
-    if (addressSearchBtn) {
-      addressSearchBtn.addEventListener("click", () => {
-        handleAddressSearch();
-      });
-    }
     if (qAddress) {
       qAddress.addEventListener("keydown", event => {
         if (event.key === "Enter") {
@@ -1501,10 +1495,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         </div>
         <div class="col-12 position-relative">
           <label class="form-label fw-semibold" for="qAddress">Address search</label>
-          <div class="input-group">
-            <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
-            <button class="btn btn-outline-primary" id="addressSearchBtn" type="button">Go</button>
-          </div>
+          <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
           <div class="list-group position-absolute w-100 shadow-sm d-none" id="addressSuggestions"></div>
           <div class="form-text text-secondary" id="addressSearchStatus"></div>
         </div>
