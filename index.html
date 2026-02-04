@@ -382,59 +382,110 @@
 
     function renderCarrierStatsSection(carrierGroups, heading) {
       if (!carrierGroups || carrierGroups.length === 0) return "";
-      const carrierStats = carrierGroups
-        .map(group => {
-          const { rows, totals } = buildRegionStats(group.items || []);
-          if (!rows.length) return "";
-          const rowHtml = rows
-            .map(row => `
+      const carrierStats = carrierGroups.map(group => {
+        const stats = buildRegionStats(group.items || []);
+        const regionMap = new Map(stats.rows.map(row => [row.region, row]));
+        return {
+          carrierKey: group.carrierKey,
+          carrierFriendly: group.carrierFriendly,
+          carrierColor: group.carrierColor,
+          stats,
+          regionMap
+        };
+      });
+      const regionSet = new Set();
+      carrierStats.forEach(group => {
+        group.stats.rows.forEach(row => regionSet.add(row.region));
+      });
+      const regions = [...regionSet].sort((a, b) => safe(a).localeCompare(safe(b)));
+      if (!regions.length) return "";
+
+      function metricValue(row, metric) {
+        if (!row) return 0;
+        if (metric === "bandwidth") return row.bandwidth;
+        if (metric === "licences") return row.licences.size;
+        return row.locations.size;
+      }
+
+      function metricTotal(totals, metric) {
+        if (metric === "bandwidth") return totals.bandwidth;
+        if (metric === "licences") return totals.licences.size;
+        return totals.locations.size;
+      }
+
+      function formatMetric(value, metric) {
+        if (metric === "bandwidth") return formatMHz(value);
+        return String(value);
+      }
+
+      function renderMetricTable(label, metric) {
+        const headerCells = carrierStats
+          .map(group => `
+            <th scope="col" class="text-end">
+              <span class="swatch-dot me-1" style="background:${safe(group.carrierColor || "#666")}"></span>
+              ${safe(group.carrierFriendly || group.carrierKey || "Unknown")}
+            </th>
+          `)
+          .join("");
+        const rows = regions
+          .map(region => {
+            const values = carrierStats.map(group => {
+              const row = group.regionMap.get(region);
+              return metricValue(row, metric);
+            });
+            const rowTotal = values.reduce((sum, value) => sum + value, 0);
+            const cells = values
+              .map(value => `<td class="text-end">${formatMetric(value, metric)}</td>`)
+              .join("");
+            return `
               <tr>
-                <td>${safe(row.region)}</td>
-                <td class="text-end">${row.locations.size}</td>
-                <td class="text-end">${row.licences.size}</td>
-                <td class="text-end">${formatMHz(row.bandwidth)}</td>
+                <td>${safe(region)}</td>
+                ${cells}
+                <td class="text-end fw-semibold">${formatMetric(rowTotal, metric)}</td>
               </tr>
-            `)
-            .join("");
-          const totalRow = `
-            <tr class="table-light">
-              <th scope="row">Total</th>
-              <th class="text-end">${totals.locations.size}</th>
-              <th class="text-end">${totals.licences.size}</th>
-              <th class="text-end">${formatMHz(totals.bandwidth)}</th>
-            </tr>
-          `;
-          return `
-            <div class="mb-3">
-              <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="swatch-dot" style="background:${safe(group.carrierColor || "#666")}"></span>
-                <div class="fw-semibold">${safe(group.carrierFriendly || group.carrierKey || "Unknown")}</div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead>
-                    <tr class="text-secondary">
-                      <th scope="col">Region</th>
-                      <th scope="col" class="text-end">Locations</th>
-                      <th scope="col" class="text-end">Licences</th>
-                      <th scope="col" class="text-end">Licensed bandwidth</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${rowHtml}
-                    ${totalRow}
-                  </tbody>
-                </table>
-              </div>
+            `;
+          })
+          .join("");
+        const totalValues = carrierStats.map(group => metricTotal(group.stats.totals, metric));
+        const grandTotal = totalValues.reduce((sum, value) => sum + value, 0);
+        const totalCells = totalValues
+          .map(value => `<th class="text-end">${formatMetric(value, metric)}</th>`)
+          .join("");
+        const totalRow = `
+          <tr class="table-light">
+            <th scope="row">Total</th>
+            ${totalCells}
+            <th class="text-end">${formatMetric(grandTotal, metric)}</th>
+          </tr>
+        `;
+        return `
+          <div class="mb-3">
+            <div class="fw-semibold mb-2">${safe(label)}</div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr class="text-secondary">
+                    <th scope="col">Region</th>
+                    ${headerCells}
+                    <th scope="col" class="text-end">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                  ${totalRow}
+                </tbody>
+              </table>
             </div>
-          `;
-        })
-        .join("");
-      if (!carrierStats) return "";
+          </div>
+        `;
+      }
+
       return `
         <div>
           <div class="fw-semibold mb-2">${safe(heading)}</div>
-          ${carrierStats}
+          ${renderMetricTable("Unique locations", "locations")}
+          ${renderMetricTable("Unique licences", "licences")}
+          ${renderMetricTable("Licensed bandwidth", "bandwidth")}
         </div>
       `;
     }
