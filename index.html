@@ -1474,35 +1474,9 @@
 
       currentClustersByGroupKey = clusterByGroupKey;
 
-      const locationBuckets = new Map();
-      groupList.forEach(g => {
-        const locKey = `${g.lat.toFixed(6)}|${g.lon.toFixed(6)}`;
-        if (!locationBuckets.has(locKey)) {
-          locationBuckets.set(locKey, []);
-        }
-        locationBuckets.get(locKey).push(g);
-      });
-
-      function offsetLatLon(lat, lon, index, total) {
-        if (total <= 1) return { lat, lon };
-        const angle = (2 * Math.PI * index) / total;
-        const meters = 25;
-        const latRad = (lat * Math.PI) / 180;
-        const dLat = (meters / 111320) * Math.sin(angle);
-        const dLon = (meters / (111320 * Math.cos(latRad))) * Math.cos(angle);
-        return { lat: lat + dLat, lon: lon + dLon };
-      }
-
-      locationBuckets.forEach((entries) => {
-        const ordered = [...entries].sort((a, b) => {
-          const aLabel = safe(a.carrierFriendly || a.carrierKey);
-          const bLabel = safe(b.carrierFriendly || b.carrierKey);
-          return aLabel.localeCompare(bLabel);
-        });
-        ordered.forEach((g, idx) => {
-          const color = g.carrierColor || "#666";
-          const offset = offsetLatLon(g.lat, g.lon, idx, ordered.length);
-          const m = L.circleMarker([offset.lat, offset.lon], {
+      groupList.forEach((g) => {
+        const color = g.carrierColor || "#666";
+        const m = L.circleMarker([g.lat, g.lon], {
             radius: 6,
             color: "#000000",
             fillColor: color,
@@ -1511,22 +1485,21 @@
             weight: 3,
             renderer: markerRenderer
           });
-          m.on("click", () => {
-            const cluster = clusterByGroupKey.get(g.key);
-            const selection = cluster
-              ? {
-                lat: g.lat,
-                lon: g.lon,
-                items: cluster.items,
-                carrierGroups: cluster.carrierGroups
-              }
-              : g;
-            // consolidated view always; single auto-expands inside renderDetailSelection
-            renderDetailSelection(selection);
-            openFiltersIfMobile();
-          });
-          m.addTo(markersLayer);
+        m.on("click", () => {
+          const cluster = clusterByGroupKey.get(g.key);
+          const selection = cluster
+            ? {
+              lat: g.lat,
+              lon: g.lon,
+              items: cluster.items,
+              carrierGroups: cluster.carrierGroups
+            }
+            : g;
+          // consolidated view always; single auto-expands inside renderDetailSelection
+          renderDetailSelection(selection);
+          openFiltersIfMobile();
         });
+        m.addTo(markersLayer);
       });
 
       if (!preserveView && withCoords.length > 0 && withCoords.length < 2000) {
