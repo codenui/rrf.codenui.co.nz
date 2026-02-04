@@ -1287,7 +1287,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       }
     }
 
-    map.on("moveend", () => {
+    document.getElementById("recentUpdateButton")?.addEventListener("click", () => {
       refreshRecentList();
     });
 
@@ -1384,7 +1384,10 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
   <div class="card" id="recentSection">
     <div class="card-body">
-      <div class="fw-semibold mb-2">10 most recent changes</div>
+      <div class="d-flex align-items-center justify-content-between mb-2 gap-2">
+        <div class="fw-semibold">10 most recent changes</div>
+        <button class="btn btn-sm btn-outline-primary" id="recentUpdateButton" type="button">Update</button>
+      </div>
       <div class="list-group" id="recentList"></div>
     </div>
   </div>
