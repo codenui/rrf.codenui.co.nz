@@ -1126,25 +1126,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       });
 
       const first = sortedItems[0];
-      const siteLabel = safe(first.location) || "Site";
       const count = sortedItems.length;
       const carrierCount = carrierGroups.length;
       const nearbySuffix = carrierCount > 1 ? " (nearby carriers within 50m)" : "";
-      const carrierNames = carrierGroups
-        .map((group) => safe(group.carrierFriendly || group.carrierKey || "Unknown"))
-        .join(", ");
-      const carrierSummary = carrierCount > 1
-        ? `<div class="fw-semibold">${carrierNames}</div>`
-        : "";
-      const headerLabel = safe(first.carrierFriendly);
-      const headerBadge = carrierCount > 1
-        ? ""
-        : `
-          <div class="rounded-4 p-2 text-white"
-               style="background:${safe(first.carrierColor)}; height:44px; display:flex; align-items:center; justify-content:center;">
-            <span class="fw-bold" style="text-align:center;">${headerLabel}</span>
-          </div>
-        `;
+      const carrierSummary = "";
+      const headerBadge = "";
 
       const accId = `acc_${safe(first.carrierKey)}_${Number(sel.lat ?? first.lat).toFixed(6)}_${Number(sel.lon ?? first.lon).toFixed(6)}`
         .replace(/[^a-zA-Z0-9_]/g, "_");
@@ -1237,6 +1223,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           return safe(a.licenceNo).localeCompare(safe(b.licenceNo));
         });
         const groupAccId = `${accId}_g_${groupIndex}`.replace(/[^a-zA-Z0-9_]/g, "_");
+        const groupSiteLabel = safe(groupItems[0]?.location) || "Site";
         const rows = groupItems
           .map((r, i) => renderRow(r, i, count === 1))
           .join("");
@@ -1247,6 +1234,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               <div class="fw-semibold">${safe(group.carrierFriendly || group.carrierKey || "Unknown")}</div>
               <span class="ms-auto badge text-bg-light">${groupItems.length} licence(s)</span>
             </div>
+            <div class="text-secondary small mb-2">${groupSiteLabel}${nearbySuffix}</div>
             <div class="accordion" id="${groupAccId}">
               ${rows}
             </div>
@@ -1268,7 +1256,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                   ${carrierSummary}
                 </div>
-                <div class="fw-semibold fs-6 ${carrierCount > 1 ? "mt-1" : "mt-2"}">${siteLabel}${nearbySuffix}</div>
               </div>
             </div>
 
