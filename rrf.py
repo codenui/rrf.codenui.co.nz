@@ -872,6 +872,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         hideAddressSuggestions();
         zoomToAddress(lat, lon);
         drawNearestCarrierLines(lat, lon);
+        closeFiltersIfMobile();
       });
     }
 
@@ -1385,6 +1386,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
       const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
       oc.show();
+      setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    function closeFiltersIfMobile() {
+      if (!window.matchMedia("(max-width: 991.98px)").matches) return;
+
+      const el = document.getElementById("filtersCanvas");
+      if (!el || !el.classList.contains("show")) return;
+
+      const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
+      oc.hide();
       setTimeout(() => map.invalidateSize(), 150);
     }
 
