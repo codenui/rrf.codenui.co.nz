@@ -691,11 +691,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
-<<<<<<< codex/remove-zoomed-to-x]-from-autocomplete
-    const addressSearchBtn = document.getElementById("addressSearchBtn");
-=======
-    const addressSearchStatus = document.getElementById("addressSearchStatus");
->>>>>>> main
     const geoLocateBtn = document.getElementById("geoLocateBtn");
 
     function geolocateUser() {
