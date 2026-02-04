@@ -398,6 +398,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       font-weight: 600;
       padding: 2px 8px;
     }
+
+    .overview-badge {
+      border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    #activeFilters .badge {
+      background: #f8f9fa;
+      border: 1px dashed rgba(0, 0, 0, 0.2);
+      color: #212529;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body class="bg-body-tertiary">
@@ -542,6 +553,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
     function safe(v) {
       return (v === null || v === undefined) ? "" : String(v);
+    }
+    function formatNumber(value) {
+      if (!Number.isFinite(value)) return "0";
+      try {
+        return Number(value).toLocaleString("en-NZ");
+      } catch (err) {
+        return String(value);
+      }
     }
     function formatMHz(value) {
       if (!Number.isFinite(value)) return "—";
@@ -759,6 +778,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     let addressSuggestTimer = null;
     let addressSuggestController = null;
     let addressSuggestionsCache = [];
+    let totalStats = null;
 
     function zoomToAddress(lat, lon) {
       const coords = [lat, lon];
@@ -1008,6 +1028,10 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
     const geoLocateBtn = document.getElementById("geoLocateBtn");
+    const overviewStats = document.getElementById("overviewStats");
+    const activeFilters = document.getElementById("activeFilters");
+    const clearFiltersBtn = document.getElementById("clearFiltersBtn");
+    const addressSearchBtn = document.getElementById("addressSearchBtn");
 
     function geolocateUser() {
       if (!navigator.geolocation) {
@@ -1098,6 +1122,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         setTimeout(() => hideAddressSuggestions(), 150);
       });
     }
+    addressSearchBtn?.addEventListener("click", () => handleAddressSearch());
     if (addressSuggestions) {
       addressSuggestions.addEventListener("click", (event) => {
         const target = event.target;
@@ -1864,9 +1889,112 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       statsCard.innerHTML = content;
     }
 
+    function buildOverviewStats(itemsList) {
+      const withCoords = itemsList.filter(r => r.lat && r.lon);
+      const locationCount = new Set(itemsList.map(r => r.location).filter(Boolean)).size;
+      const groupKeys = new Set(
+        withCoords.map(r => {
+          const lat = Number(r.lat);
+          const lon = Number(r.lon);
+          const carrierKey = r.carrierKey || "unknown";
+          return `${carrierKey}|${lat.toFixed(6)}|${lon.toFixed(6)}`;
+        })
+      );
+      return {
+        licences: itemsList.length,
+        markers: groupKeys.size,
+        locations: locationCount,
+        mapped: withCoords.length
+      };
+    }
+
+    totalStats = buildOverviewStats(DATA);
+
+    function formatCount(value, label) {
+      return `
+        <div class="badge text-bg-light overview-badge">
+          <div class="small text-secondary">${safe(label)}</div>
+          <div class="fs-6 fw-semibold">${formatNumber(value)}</div>
+        </div>
+      `;
+    }
+
+    function formatDateRangeLabel(fromDate, toDate) {
+      const fromLabel = fromDate ? fromDate.toISOString().slice(0, 10) : "Any";
+      const toLabel = toDate ? toDate.toISOString().slice(0, 10) : "Any";
+      if (!fromDate && !toDate) return "";
+      return `${fromLabel} → ${toLabel}`;
+    }
+
+    function renderActiveFilters(filters, districtLabel) {
+      if (!activeFilters) return;
+      const labels = [];
+      if (filters.locationText) labels.push(`Location: ${qLocation.value}`);
+      if (filters.district) labels.push(`District: ${districtLabel}`);
+
+      if (carrierSelected.size > 0) {
+        const carrierLabels = [...carrierSelected]
+          .map(key => CARRIERS[key]?.friendly || key)
+          .join(", ");
+        labels.push(`Carriers: ${carrierLabels}`);
+      }
+
+      if (bandSelected.size > 0) {
+        const bandMap = new Map(BAND_DEFS.map(([code, label]) => [code, label]));
+        const bandLabels = [...bandSelected]
+          .map(code => bandMap.get(code) || code)
+          .join(", ");
+        labels.push(`Bands: ${bandLabels}`);
+      }
+
+      const commRange = formatDateRangeLabel(filters.commFrom, filters.commTo);
+      if (commRange) labels.push(`Commencement: ${commRange}`);
+      const expRange = formatDateRangeLabel(filters.expFrom, filters.expTo);
+      if (expRange) labels.push(`Expiry: ${expRange}`);
+
+      if (labels.length === 0) {
+        activeFilters.innerHTML = `
+          <div class="text-secondary small">No filters applied. Showing all licences.</div>
+        `;
+        return;
+      }
+
+      activeFilters.innerHTML = labels
+        .map(label => `<span class="badge">${safe(label)}</span>`)
+        .join(" ");
+    }
+
+    function renderOverviewSummary(filtered, groups, withCoords) {
+      if (!overviewStats) return;
+      const locationCount = new Set(filtered.map(r => r.location).filter(Boolean)).size;
+      const totals = totalStats;
+      const totalsLabel = totals
+        ? `Showing ${formatNumber(filtered.length)} of ${formatNumber(totals.licences)} licences`
+        : `Showing ${formatNumber(filtered.length)} licences`;
+      const markerLabel = totals
+        ? `${formatNumber(groups.size)} of ${formatNumber(totals.markers)} markers`
+        : `${formatNumber(groups.size)} markers`;
+      const locationLabel = totals
+        ? `${formatNumber(locationCount)} of ${formatNumber(totals.locations)} locations`
+        : `${formatNumber(locationCount)} locations`;
+      const mappedLabel = totals
+        ? `${formatNumber(withCoords.length)} of ${formatNumber(totals.mapped)} mapped`
+        : `${formatNumber(withCoords.length)} mapped`;
+      overviewStats.innerHTML = `
+        ${formatCount(filtered.length, "Licences")}
+        ${formatCount(groups.size, "Markers")}
+        ${formatCount(locationCount, "Locations")}
+        ${formatCount(withCoords.length, "Mapped")}
+        <div class="text-secondary small w-100 mt-2">
+          ${totalsLabel} • ${markerLabel} • ${locationLabel} • ${mappedLabel}
+        </div>
+      `;
+    }
+
     function refresh({ preserveView = false } = {}) {
       clearAddressLines();
       const f = getFilters();
+      const districtLabel = qDistrict?.selectedOptions?.[0]?.textContent || "";
 
       // Apply ONLY non-carrier/non-band filters first
       const baseFiltered = DATA.filter(r => passesBaseFilters(r, f));
@@ -1927,6 +2055,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
       // make available to other UI handlers (eg recent list click -> open full group)
       currentGroups = groups;
+
+      renderOverviewSummary(filtered, groups, withCoords);
+      renderActiveFilters(f, districtLabel);
 
       const groupList = [...groups.values()];
 
@@ -2038,6 +2169,27 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     // Clear detail button in header
     document.getElementById("clearDetail")?.addEventListener("click", () => renderDetailSelection(null));
+    clearFiltersBtn?.addEventListener("click", () => {
+      qDistrict.value = "";
+      qLocation.value = "";
+      qAddress.value = "";
+      qCommFrom.value = "";
+      qCommTo.value = "";
+      qExpFrom.value = "";
+      qExpTo.value = "";
+      carrierSelected.clear();
+      bandSelected.clear();
+      syncCarrierButtons();
+      syncBandButtons();
+      clearAddressLines();
+      hideAddressSuggestions();
+      if (addressMarker) {
+        addressMarker.remove();
+        addressMarker = null;
+      }
+      renderDetailSelection(null);
+      refreshImmediate();
+    });
 
     renderDetailSelection(null);
     refresh();
@@ -2063,17 +2215,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     </div>
   </div>
 
-  <div class="card" id="carrierSection">
+  <div class="card" id="overviewSection">
     <div class="card-body">
-      <div class="fw-semibold mb-2">Carriers</div>
-      <div class="btn-group gap-2 flex-wrap" role="group" aria-label="Carriers" id="carrierBtns"></div>
-    </div>
-  </div>
-
-  <div class="card" id="bandSection">
-    <div class="card-body">
-        <div class="fw-semibold mb-2">Bands</div>
-        <div class="btn-group gap-2 flex-wrap" role="group" aria-label="Bands" id="bandBtns"></div>
+      <div class="d-flex align-items-center justify-content-between mb-2 gap-2">
+        <div class="fw-semibold">Overview</div>
+        <button class="btn btn-sm btn-outline-secondary" id="clearFiltersBtn" type="button">Reset filters</button>
+      </div>
+      <div class="d-flex flex-wrap gap-2" id="overviewStats"></div>
+      <div class="d-flex flex-wrap gap-2 mt-2" id="activeFilters"></div>
     </div>
   </div>
 
@@ -2092,10 +2241,28 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         </div>
         <div class="col-12 position-relative">
           <label class="form-label fw-semibold" for="qAddress">Address search</label>
-          <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
+          <div class="input-group">
+            <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
+            <button class="btn btn-outline-secondary" id="addressSearchBtn" type="button">Search</button>
+          </div>
+          <div class="form-text">Tip: paste coordinates like “-41.29, 174.78”.</div>
           <div class="list-group position-absolute w-100 shadow-sm d-none" id="addressSuggestions"></div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="card" id="carrierSection">
+    <div class="card-body">
+      <div class="fw-semibold mb-2">Carriers</div>
+      <div class="btn-group gap-2 flex-wrap" role="group" aria-label="Carriers" id="carrierBtns"></div>
+    </div>
+  </div>
+
+  <div class="card" id="bandSection">
+    <div class="card-body">
+        <div class="fw-semibold mb-2">Bands</div>
+        <div class="btn-group gap-2 flex-wrap" role="group" aria-label="Bands" id="bandBtns"></div>
     </div>
   </div>
 
