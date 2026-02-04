@@ -356,6 +356,15 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     .map-style-control select {
       min-width: 160px;
     }
+
+    #regionSection {
+      position: relative;
+      z-index: 2;
+    }
+
+    #addressSuggestions {
+      z-index: 1050;
+    }
   </style>
 </head>
 <body class="bg-body-tertiary">
@@ -504,16 +513,16 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     // Map init
     const map = L.map("map");
     const baseLayers = {
-      Terrain: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
-        maxZoom: 17,
-        attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
-      }),
-      Streets: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
+      }),
+      "Topographic": L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+        maxZoom: 17,
+        attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
       })
     };
-    baseLayers.Terrain.addTo(map);
+    baseLayers.OpenStreetMap.addTo(map);
     map.setView([-41.2, 174.7], 5);
 
     const MapStyleControl = L.Control.extend({
@@ -534,7 +543,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     const mapStyleSelect = document.getElementById("mapStyleSelect");
     if (mapStyleSelect) {
-      mapStyleSelect.value = "Terrain";
+      mapStyleSelect.value = "OpenStreetMap";
       mapStyleSelect.addEventListener("change", (event) => {
         const selected = event.target.value;
         Object.entries(baseLayers).forEach(([name, layer]) => {
@@ -682,7 +691,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
+<<<<<<< codex/remove-zoomed-to-x]-from-autocomplete
     const addressSearchBtn = document.getElementById("addressSearchBtn");
+=======
+    const addressSearchStatus = document.getElementById("addressSearchStatus");
+>>>>>>> main
     const geoLocateBtn = document.getElementById("geoLocateBtn");
 
     function geolocateUser() {
@@ -739,11 +752,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
     populateDistricts();
 
-    if (addressSearchBtn) {
-      addressSearchBtn.addEventListener("click", () => {
-        handleAddressSearch();
-      });
-    }
     if (qAddress) {
       qAddress.addEventListener("keydown", event => {
         if (event.key === "Enter") {
@@ -1469,10 +1477,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         </div>
         <div class="col-12 position-relative">
           <label class="form-label fw-semibold" for="qAddress">Address search</label>
-          <div class="input-group">
-            <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
-            <button class="btn btn-outline-primary" id="addressSearchBtn" type="button">Go</button>
-          </div>
+          <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
           <div class="list-group position-absolute w-100 shadow-sm d-none" id="addressSuggestions"></div>
         </div>
       </div>
