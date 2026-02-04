@@ -350,6 +350,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     .card { border-radius: unset; }
 
+    .offcanvas-lg .offcanvas-body { display: unset; }
+
     .map-style-control {
       background: rgba(255, 255, 255, 0.95);
       border-radius: 0.25rem;
@@ -1074,9 +1076,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
     buildBandUI();
 
-    // Debounced refresh to avoid glitches when typing quickly
+    // Refresh helpers
     let refreshTimer = null;
-    function refreshDebounced() {
+    function refreshDebouncedLocation() {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
         refreshTimer = null;
@@ -1092,9 +1094,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
 
      // Filter events
-     [qLocation, qDistrict, qCommFrom, qCommTo, qExpFrom, qExpTo].forEach(el => {
-      el.addEventListener("input", refreshDebounced);
-      el.addEventListener("change", refreshDebounced);
+     qLocation?.addEventListener("input", refreshDebouncedLocation);
+     qLocation?.addEventListener("change", () => refreshImmediate({ preserveView: true }));
+     [qDistrict, qCommFrom, qCommTo, qExpFrom, qExpTo].forEach(el => {
+      el.addEventListener("input", () => refreshImmediate({ preserveView: true }));
+      el.addEventListener("change", () => refreshImmediate({ preserveView: true }));
      });
 
     // -------------------------------------------------------------------------
