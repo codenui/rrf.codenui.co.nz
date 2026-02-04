@@ -795,6 +795,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             }).addTo(map);
           }
           map.setView([latitude, longitude], 12);
+          drawNearestCarrierLines(latitude, longitude);
         },
         (error) => {
           window.alert(`Unable to fetch your location: ${error.message}`);
