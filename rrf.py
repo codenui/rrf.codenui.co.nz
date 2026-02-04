@@ -550,6 +550,156 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       return `${display} MHz`;
     }
 
+    function regionLabelForItem(item) {
+      const regions = Array.isArray(item.locationDistrictNames)
+        ? item.locationDistrictNames
+        : [];
+      if (!regions.length) return "Unknown";
+      return regions[0];
+    }
+
+    function buildRegionStats(itemsList) {
+      const regionMap = new Map();
+      const totals = {
+        locations: new Set(),
+        licences: new Set(),
+        bandwidth: 0,
+      };
+      itemsList.forEach(item => {
+        const region = regionLabelForItem(item);
+        if (!regionMap.has(region)) {
+          regionMap.set(region, {
+            region,
+            locations: new Set(),
+            licences: new Set(),
+            bandwidth: 0,
+          });
+        }
+        const entry = regionMap.get(region);
+        if (item.location) entry.locations.add(item.location);
+        if (item.licenceNo) entry.licences.add(item.licenceNo);
+        const bw = Number(item.bandwidthMHz);
+        if (Number.isFinite(bw)) entry.bandwidth += bw;
+        if (item.location) totals.locations.add(item.location);
+        if (item.licenceNo) totals.licences.add(item.licenceNo);
+        if (Number.isFinite(bw)) totals.bandwidth += bw;
+      });
+      const rows = [...regionMap.values()].sort((a, b) => {
+        return safe(a.region).localeCompare(safe(b.region));
+      });
+      return { rows, totals };
+    }
+
+    function renderCarrierStatsSection(carrierGroups, heading) {
+      if (!carrierGroups || carrierGroups.length === 0) return "";
+      const carrierStats = carrierGroups.map(group => {
+        const stats = buildRegionStats(group.items || []);
+        const regionMap = new Map(stats.rows.map(row => [row.region, row]));
+        return {
+          carrierKey: group.carrierKey,
+          carrierFriendly: group.carrierFriendly,
+          carrierColor: group.carrierColor,
+          stats,
+          regionMap
+        };
+      });
+      const regionSet = new Set();
+      carrierStats.forEach(group => {
+        group.stats.rows.forEach(row => regionSet.add(row.region));
+      });
+      const regions = [...regionSet].sort((a, b) => safe(a).localeCompare(safe(b)));
+      if (!regions.length) return "";
+
+      function metricValue(row, metric) {
+        if (!row) return 0;
+        if (metric === "bandwidth") return row.bandwidth;
+        if (metric === "licences") return row.licences.size;
+        return row.locations.size;
+      }
+
+      function metricTotal(totals, metric) {
+        if (metric === "bandwidth") return totals.bandwidth;
+        if (metric === "licences") return totals.licences.size;
+        return totals.locations.size;
+      }
+
+      function formatMetric(value, metric) {
+        if (metric === "bandwidth") return formatMHz(value);
+        return String(value);
+      }
+
+      function renderMetricTable(label, metric) {
+        const headerCells = carrierStats
+          .map(group => `
+            <th scope="col" class="text-end">
+              <span class="swatch-dot me-1" style="background:${safe(group.carrierColor || "#666")}"></span>
+              ${safe(group.carrierFriendly || group.carrierKey || "Unknown")}
+            </th>
+          `)
+          .join("");
+        const rows = regions
+          .map(region => {
+            const values = carrierStats.map(group => {
+              const row = group.regionMap.get(region);
+              return metricValue(row, metric);
+            });
+            const rowTotal = values.reduce((sum, value) => sum + value, 0);
+            const cells = values
+              .map(value => `<td class="text-end">${formatMetric(value, metric)}</td>`)
+              .join("");
+            return `
+              <tr>
+                <td>${safe(region)}</td>
+                ${cells}
+                <td class="text-end fw-semibold">${formatMetric(rowTotal, metric)}</td>
+              </tr>
+            `;
+          })
+          .join("");
+        const totalValues = carrierStats.map(group => metricTotal(group.stats.totals, metric));
+        const grandTotal = totalValues.reduce((sum, value) => sum + value, 0);
+        const totalCells = totalValues
+          .map(value => `<th class="text-end">${formatMetric(value, metric)}</th>`)
+          .join("");
+        const totalRow = `
+          <tr class="table-light">
+            <th scope="row">Total</th>
+            ${totalCells}
+            <th class="text-end">${formatMetric(grandTotal, metric)}</th>
+          </tr>
+        `;
+        return `
+          <div class="mb-3">
+            <div class="fw-semibold mb-2">${safe(label)}</div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr class="text-secondary">
+                    <th scope="col">Region</th>
+                    ${headerCells}
+                    <th scope="col" class="text-end">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                  ${totalRow}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div>
+          <div class="fw-semibold mb-2">${safe(heading)}</div>
+          ${renderMetricTable("Unique locations", "locations")}
+          ${renderMetricTable("Unique licences", "licences")}
+          ${renderMetricTable("Licensed bandwidth", "bandwidth")}
+        </div>
+      `;
+    }
+
     // Map init
     const map = L.map("map", { preferCanvas: true });
     const markerPane = map.createPane("rrfMarkers");
@@ -852,6 +1002,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const bandBtns = document.getElementById("bandBtns");
 
     const detailCard = document.getElementById("detailCard");
+    const statsCard = document.getElementById("statsCard");
     const recentList = document.getElementById("recentList");
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
@@ -1572,6 +1723,45 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       renderRecentList(visible);
     }
 
+    function buildCarrierGroupsFromItems(itemsList) {
+      const carrierMap = new Map();
+      itemsList.forEach(item => {
+        const carrierKey = item.carrierKey || "unknown";
+        if (!carrierMap.has(carrierKey)) {
+          carrierMap.set(carrierKey, {
+            carrierKey,
+            carrierFriendly: item.carrierFriendly,
+            carrierColor: item.carrierColor,
+            items: []
+          });
+        }
+        carrierMap.get(carrierKey).items.push(item);
+      });
+      return [...carrierMap.values()].sort((a, b) => {
+        const aLabel = safe(a.carrierFriendly || a.carrierKey);
+        const bLabel = safe(b.carrierFriendly || b.carrierKey);
+        return aLabel.localeCompare(bLabel);
+      });
+    }
+
+    function renderStatsSummary(itemsList) {
+      if (!statsCard) return;
+      if (!itemsList || itemsList.length === 0) {
+        statsCard.className = "text-secondary";
+        statsCard.innerHTML = "Apply filters or select a site to see stats.";
+        return;
+      }
+      const carrierGroups = buildCarrierGroupsFromItems(itemsList);
+      const content = renderCarrierStatsSection(carrierGroups, "Stats by carrier");
+      if (!content) {
+        statsCard.className = "text-secondary";
+        statsCard.innerHTML = "No stats available for the current selection.";
+        return;
+      }
+      statsCard.className = "";
+      statsCard.innerHTML = content;
+    }
+
     function refresh({ preserveView = false } = {}) {
       clearAddressLines();
       const f = getFilters();
@@ -1604,6 +1794,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
       latestFiltered = filtered;
       refreshRecentList();
+      renderStatsSummary(filtered);
 
       // group markers by carrier + coordinate so one marker can represent multiple licences
       markersLayer.clearLayers();
@@ -1851,6 +2042,13 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     <div class="card-body">
       <div class="fw-semibold mb-2">Details</div>
       <div id="detailCard" class="text-secondary"></div>
+    </div>
+  </div>
+
+  <div class="card" id="statsSection">
+    <div class="card-body">
+      <div class="fw-semibold mb-2">Stats by carrier</div>
+      <div id="statsCard" class="text-secondary">Apply filters or select a site to see stats.</div>
     </div>
   </div>
 
