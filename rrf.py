@@ -515,7 +515,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
 
     // Map init
-    const map = L.map("map");
+    const map = L.map("map", { preferCanvas: true });
+    const markerRenderer = L.canvas({ padding: 0.5 });
     const baseLayers = {
       "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -1643,7 +1644,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             fillColor: color,
             fillOpacity: 1,
             opacity: 1,
-            weight: 3
+            weight: 3,
+            renderer: markerRenderer
           });
           m.on("click", () => {
             const cluster = clusterByGroupKey.get(g.key);
