@@ -754,13 +754,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       if (recentSection) recentSection.style.display = "none";
       if (regionSection) regionSection.style.display = "none";
 
-      // stable sorting: commencement desc then licenceNo
+      // stable sorting: frequency asc then licenceNo
       const items = [...sel.items].sort((a, b) => {
-        const da = parseISO(a.commencementDate);
-        const db = parseISO(b.commencementDate);
-        const ta = da ? da.getTime() : -Infinity;
-        const tb = db ? db.getTime() : -Infinity;
-        if (tb !== ta) return tb - ta;
+        const fa = Number(a.refFrequencyMHz);
+        const fb = Number(b.refFrequencyMHz);
+        const hasFa = Number.isFinite(fa);
+        const hasFb = Number.isFinite(fb);
+        if (hasFa && hasFb && fa !== fb) return fa - fb;
+        if (hasFa !== hasFb) return hasFa ? -1 : 1;
         return safe(a.licenceNo).localeCompare(safe(b.licenceNo));
       });
 
