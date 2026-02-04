@@ -563,19 +563,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     let addressSuggestController = null;
     let addressSuggestionsCache = [];
 
-    function setAddressStatus(message, tone = "muted") {
-      if (!addressSearchStatus) return;
-      addressSearchStatus.textContent = message || "";
-      addressSearchStatus.classList.remove("text-secondary", "text-danger", "text-success");
-      if (tone === "danger") {
-        addressSearchStatus.classList.add("text-danger");
-      } else if (tone === "success") {
-        addressSearchStatus.classList.add("text-success");
-      } else {
-        addressSearchStatus.classList.add("text-secondary");
-      }
-    }
-
     function zoomToAddress(lat, lon) {
       const coords = [lat, lon];
       map.setView(coords, 15);
@@ -643,18 +630,15 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       hideAddressSuggestions();
       const query = qAddress.value.trim();
       if (!query) {
-        setAddressStatus("Enter an address to search.", "danger");
         return;
       }
 
       const latLon = parseLatLon(query);
       if (latLon) {
         zoomToAddress(latLon.lat, latLon.lon);
-        setAddressStatus(`Zoomed to ${latLon.lat.toFixed(5)}, ${latLon.lon.toFixed(5)}.`, "success");
         return;
       }
 
-      setAddressStatus("Searching…");
       try {
         const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
         const response = await fetch(url, { headers: { Accept: "application/json" } });
@@ -663,20 +647,16 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         }
         const results = await response.json();
         if (!results || results.length === 0) {
-          setAddressStatus("No results found. Try a more specific address.", "danger");
           return;
         }
         const best = results[0];
         const lat = Number(best.lat);
         const lon = Number(best.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          setAddressStatus("Search result did not include usable coordinates.", "danger");
           return;
         }
         zoomToAddress(lat, lon);
-        setAddressStatus(`Zoomed to ${best.display_name || query}.`, "success");
       } catch (err) {
-        setAddressStatus(err?.message || "Search failed. Please try again.", "danger");
       }
     }
 
@@ -711,7 +691,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
-    const addressSearchStatus = document.getElementById("addressSearchStatus");
     const geoLocateBtn = document.getElementById("geoLocateBtn");
 
     function geolocateUser() {
@@ -809,13 +788,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         const lat = Number(result.lat);
         const lon = Number(result.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          setAddressStatus("Search result did not include usable coordinates.", "danger");
           return;
         }
         qAddress.value = result.display_name || qAddress.value;
         hideAddressSuggestions();
         zoomToAddress(lat, lon);
-        setAddressStatus(`Zoomed to ${result.display_name || qAddress.value}.`, "success");
       });
     }
 
@@ -1497,7 +1474,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           <label class="form-label fw-semibold" for="qAddress">Address search</label>
           <input class="form-control" id="qAddress" type="text" placeholder="Search address or lat,lon" autocomplete="off" />
           <div class="list-group position-absolute w-100 shadow-sm d-none" id="addressSuggestions"></div>
-          <div class="form-text text-secondary" id="addressSearchStatus"></div>
         </div>
       </div>
     </div>
