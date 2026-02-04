@@ -1497,9 +1497,107 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         `;
       }
 
+      function regionLabelForItem(item) {
+        const regions = Array.isArray(item.locationDistrictNames)
+          ? item.locationDistrictNames
+          : [];
+        if (!regions.length) return "Unknown";
+        return regions[0];
+      }
+
+      function buildRegionStats(itemsList) {
+        const regionMap = new Map();
+        const totals = {
+          locations: new Set(),
+          licences: new Set(),
+          bandwidth: 0,
+        };
+        itemsList.forEach(item => {
+          const region = regionLabelForItem(item);
+          if (!regionMap.has(region)) {
+            regionMap.set(region, {
+              region,
+              locations: new Set(),
+              licences: new Set(),
+              bandwidth: 0,
+            });
+          }
+          const entry = regionMap.get(region);
+          if (item.location) entry.locations.add(item.location);
+          if (item.licenceNo) entry.licences.add(item.licenceNo);
+          const bw = Number(item.bandwidthMHz);
+          if (Number.isFinite(bw)) entry.bandwidth += bw;
+          if (item.location) totals.locations.add(item.location);
+          if (item.licenceNo) totals.licences.add(item.licenceNo);
+          if (Number.isFinite(bw)) totals.bandwidth += bw;
+        });
+        const rows = [...regionMap.values()].sort((a, b) => {
+          return safe(a.region).localeCompare(safe(b.region));
+        });
+        return { rows, totals };
+      }
+
       const carrierSections = carrierGroups
         .map((group, idx) => renderCarrierSection(group, idx))
         .join("");
+
+      const carrierStats = carrierGroups
+        .map(group => {
+          const { rows, totals } = buildRegionStats(group.items || []);
+          if (!rows.length) return "";
+          const rowHtml = rows
+            .map(row => `
+              <tr>
+                <td>${safe(row.region)}</td>
+                <td class="text-end">${row.locations.size}</td>
+                <td class="text-end">${row.licences.size}</td>
+                <td class="text-end">${formatMHz(row.bandwidth)}</td>
+              </tr>
+            `)
+            .join("");
+          const totalRow = `
+            <tr class="table-light">
+              <th scope="row">Total</th>
+              <th class="text-end">${totals.locations.size}</th>
+              <th class="text-end">${totals.licences.size}</th>
+              <th class="text-end">${formatMHz(totals.bandwidth)}</th>
+            </tr>
+          `;
+          return `
+            <div class="mb-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="swatch-dot" style="background:${safe(group.carrierColor || "#666")}"></span>
+                <div class="fw-semibold">${safe(group.carrierFriendly || group.carrierKey || "Unknown")}</div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr class="text-secondary">
+                      <th scope="col">Region</th>
+                      <th scope="col" class="text-end">Locations</th>
+                      <th scope="col" class="text-end">Licences</th>
+                      <th scope="col" class="text-end">Licensed bandwidth</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowHtml}
+                    ${totalRow}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      const statsSection = carrierStats
+        ? `
+          <div class="mt-4">
+            <div class="fw-semibold mb-2">Stats by carrier</div>
+            ${carrierStats}
+          </div>
+        `
+        : "";
 
       detailCard.className = "";
       detailCard.innerHTML = `
@@ -1522,9 +1620,13 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           </div>
         </div>
 
+        ${statsSection}
+
         <div class="mt-3" id="${accId}">
           ${carrierSections}
         </div>
+
+        ${statsSection}
       `;
 
       document.getElementById("clearDetailBtn")?.addEventListener("click", () => renderDetailSelection(null));
