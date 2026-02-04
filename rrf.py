@@ -355,6 +355,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     <div class="container-fluid">
       <span class="navbar-brand fw-semibold">RRF Licence Map</span>
       <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" id="geoLocateBtn" type="button">
+          Locate me
+        </button>
         <button class="btn btn-outline-primary d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#filtersCanvas" aria-controls="filtersCanvas">
           Filters
         </button>
@@ -489,6 +492,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     map.setView([-41.2, 174.7], 5);
 
     let markersLayer = L.layerGroup().addTo(map);
+    let userMarker = null;
     
     function updateNavHeight() {
       const bar = document.getElementById("topbar");
@@ -517,6 +521,42 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
+    const geoLocateBtn = document.getElementById("geoLocateBtn");
+
+    function geolocateUser() {
+      if (!navigator.geolocation) {
+        window.alert("Geolocation is not supported by this browser.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          if (userMarker) {
+            userMarker.setLatLng([latitude, longitude]);
+          } else {
+            userMarker = L.circleMarker([latitude, longitude], {
+              radius: 7,
+              color: "#0d6efd",
+              fillColor: "#0d6efd",
+              fillOpacity: 0.7,
+              weight: 2
+            }).addTo(map);
+          }
+          map.setView([latitude, longitude], 12);
+        },
+        (error) => {
+          window.alert(`Unable to fetch your location: ${error.message}`);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000
+        }
+      );
+    }
+
+    geoLocateBtn?.addEventListener("click", geolocateUser);
     const carrierSection = document.getElementById("carrierSection");
     const bandSection = document.getElementById("bandSection");
     
