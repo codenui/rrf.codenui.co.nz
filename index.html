@@ -675,6 +675,7 @@
         hideAddressSuggestions();
         zoomToAddress(lat, lon);
         drawNearestCarrierLines(lat, lon);
+        closeFiltersIfMobile();
       });
     }
 
@@ -1188,6 +1189,17 @@
 
       const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
       oc.show();
+      setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    function closeFiltersIfMobile() {
+      if (!window.matchMedia("(max-width: 991.98px)").matches) return;
+
+      const el = document.getElementById("filtersCanvas");
+      if (!el || !el.classList.contains("show")) return;
+
+      const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
+      oc.hide();
       setTimeout(() => map.invalidateSize(), 150);
     }
 
