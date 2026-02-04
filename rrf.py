@@ -1129,7 +1129,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       const first = sortedItems[0];
       const count = sortedItems.length;
       const carrierCount = carrierGroups.length;
-      const nearbySuffix = carrierCount > 1 ? " (nearby carriers within 50m)" : "";
+      const nearbySuffix = "";
       const carrierSummary = "";
       const headerBadge = "";
 
