@@ -178,6 +178,8 @@ def fetch_all(
 def pick_lat_lon(
     geo_refs: List[Dict[str, Any]],
     transformer_2193_to_4326: Optional[Any],
+    transformer_4167_to_4326: Optional[Any],
+    transformer_4272_to_4326: Optional[Any],
 ) -> Tuple[Optional[float], Optional[float], str]:
     """Returns (lat, lon, sourceType).
 
@@ -195,6 +197,10 @@ def pick_lat_lon(
                 try:
                     lon = float(g["easting"])
                     lat = float(g["northing"])
+                    if t == "D2000" and transformer_4167_to_4326 is not None:
+                        lon, lat = transformer_4167_to_4326.transform(lon, lat)
+                    elif t == "D" and transformer_4272_to_4326 is not None:
+                        lon, lat = transformer_4272_to_4326.transform(lon, lat)
                     if -60 < lat < -20 and 150 < lon < 190:
                         return lat, lon, t
                 except Exception:
@@ -226,11 +232,21 @@ def iso_date_or_none(s: Any) -> Optional[str]:
 
 def normalise_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     transformer = None
+    transformer_4167 = None
+    transformer_4272 = None
     if Transformer is not None:
         try:
             transformer = Transformer.from_crs("EPSG:2193", "EPSG:4326", always_xy=True)
         except Exception:
             transformer = None
+        try:
+            transformer_4167 = Transformer.from_crs("EPSG:4167", "EPSG:4326", always_xy=True)
+        except Exception:
+            transformer_4167 = None
+        try:
+            transformer_4272 = Transformer.from_crs("EPSG:4272", "EPSG:4326", always_xy=True)
+        except Exception:
+            transformer_4272 = None
 
     out: List[Dict[str, Any]] = []
     for r in records:
@@ -238,7 +254,7 @@ def normalise_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             continue
 
         geo = r.get("locationGeoReferences") or []
-        lat, lon, geo_src = pick_lat_lon(geo, transformer)
+        lat, lon, geo_src = pick_lat_lon(geo, transformer, transformer_4167, transformer_4272)
 
         lower = r.get("lowerBound")
         upper = r.get("upperBound")
