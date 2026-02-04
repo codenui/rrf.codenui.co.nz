@@ -853,7 +853,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               fillColor: "#0d6efd",
               fillOpacity: 0.7,
               weight: 2,
-              pane: "rrfMarkers"
+              pane: "rrfMarkers",
+              renderer: markerRenderer
             }).addTo(map);
           }
           map.setView([latitude, longitude], 12);
