@@ -550,6 +550,105 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       return `${display} MHz`;
     }
 
+    function regionLabelForItem(item) {
+      const regions = Array.isArray(item.locationDistrictNames)
+        ? item.locationDistrictNames
+        : [];
+      if (!regions.length) return "Unknown";
+      return regions[0];
+    }
+
+    function buildRegionStats(itemsList) {
+      const regionMap = new Map();
+      const totals = {
+        locations: new Set(),
+        licences: new Set(),
+        bandwidth: 0,
+      };
+      itemsList.forEach(item => {
+        const region = regionLabelForItem(item);
+        if (!regionMap.has(region)) {
+          regionMap.set(region, {
+            region,
+            locations: new Set(),
+            licences: new Set(),
+            bandwidth: 0,
+          });
+        }
+        const entry = regionMap.get(region);
+        if (item.location) entry.locations.add(item.location);
+        if (item.licenceNo) entry.licences.add(item.licenceNo);
+        const bw = Number(item.bandwidthMHz);
+        if (Number.isFinite(bw)) entry.bandwidth += bw;
+        if (item.location) totals.locations.add(item.location);
+        if (item.licenceNo) totals.licences.add(item.licenceNo);
+        if (Number.isFinite(bw)) totals.bandwidth += bw;
+      });
+      const rows = [...regionMap.values()].sort((a, b) => {
+        return safe(a.region).localeCompare(safe(b.region));
+      });
+      return { rows, totals };
+    }
+
+    function renderCarrierStatsSection(carrierGroups, heading) {
+      if (!carrierGroups || carrierGroups.length === 0) return "";
+      const carrierStats = carrierGroups
+        .map(group => {
+          const { rows, totals } = buildRegionStats(group.items || []);
+          if (!rows.length) return "";
+          const rowHtml = rows
+            .map(row => `
+              <tr>
+                <td>${safe(row.region)}</td>
+                <td class="text-end">${row.locations.size}</td>
+                <td class="text-end">${row.licences.size}</td>
+                <td class="text-end">${formatMHz(row.bandwidth)}</td>
+              </tr>
+            `)
+            .join("");
+          const totalRow = `
+            <tr class="table-light">
+              <th scope="row">Total</th>
+              <th class="text-end">${totals.locations.size}</th>
+              <th class="text-end">${totals.licences.size}</th>
+              <th class="text-end">${formatMHz(totals.bandwidth)}</th>
+            </tr>
+          `;
+          return `
+            <div class="mb-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="swatch-dot" style="background:${safe(group.carrierColor || "#666")}"></span>
+                <div class="fw-semibold">${safe(group.carrierFriendly || group.carrierKey || "Unknown")}</div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr class="text-secondary">
+                      <th scope="col">Region</th>
+                      <th scope="col" class="text-end">Locations</th>
+                      <th scope="col" class="text-end">Licences</th>
+                      <th scope="col" class="text-end">Licensed bandwidth</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowHtml}
+                    ${totalRow}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+      if (!carrierStats) return "";
+      return `
+        <div>
+          <div class="fw-semibold mb-2">${safe(heading)}</div>
+          ${carrierStats}
+        </div>
+      `;
+    }
+
     // Map init
     const map = L.map("map", { preferCanvas: true });
     const markerPane = map.createPane("rrfMarkers");
@@ -852,6 +951,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const bandBtns = document.getElementById("bandBtns");
 
     const detailCard = document.getElementById("detailCard");
+    const statsCard = document.getElementById("statsCard");
     const recentList = document.getElementById("recentList");
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
@@ -1674,6 +1774,45 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       renderRecentList(visible);
     }
 
+    function buildCarrierGroupsFromItems(itemsList) {
+      const carrierMap = new Map();
+      itemsList.forEach(item => {
+        const carrierKey = item.carrierKey || "unknown";
+        if (!carrierMap.has(carrierKey)) {
+          carrierMap.set(carrierKey, {
+            carrierKey,
+            carrierFriendly: item.carrierFriendly,
+            carrierColor: item.carrierColor,
+            items: []
+          });
+        }
+        carrierMap.get(carrierKey).items.push(item);
+      });
+      return [...carrierMap.values()].sort((a, b) => {
+        const aLabel = safe(a.carrierFriendly || a.carrierKey);
+        const bLabel = safe(b.carrierFriendly || b.carrierKey);
+        return aLabel.localeCompare(bLabel);
+      });
+    }
+
+    function renderStatsSummary(itemsList) {
+      if (!statsCard) return;
+      if (!itemsList || itemsList.length === 0) {
+        statsCard.className = "text-secondary";
+        statsCard.innerHTML = "Apply filters or select a site to see stats.";
+        return;
+      }
+      const carrierGroups = buildCarrierGroupsFromItems(itemsList);
+      const content = renderCarrierStatsSection(carrierGroups, "Stats by carrier");
+      if (!content) {
+        statsCard.className = "text-secondary";
+        statsCard.innerHTML = "No stats available for the current selection.";
+        return;
+      }
+      statsCard.className = "";
+      statsCard.innerHTML = content;
+    }
+
     function refresh({ preserveView = false } = {}) {
       clearAddressLines();
       const f = getFilters();
@@ -1706,6 +1845,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
       latestFiltered = filtered;
       refreshRecentList();
+      renderStatsSummary(filtered);
 
       // group markers by carrier + coordinate so one marker can represent multiple licences
       markersLayer.clearLayers();
@@ -1953,6 +2093,13 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     <div class="card-body">
       <div class="fw-semibold mb-2">Details</div>
       <div id="detailCard" class="text-secondary"></div>
+    </div>
+  </div>
+
+  <div class="card" id="statsSection">
+    <div class="card-body">
+      <div class="fw-semibold mb-2">Stats by carrier</div>
+      <div id="statsCard" class="text-secondary">Apply filters or select a site to see stats.</div>
     </div>
   </div>
 
