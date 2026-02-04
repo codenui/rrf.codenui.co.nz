@@ -515,15 +515,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       return `${display} MHz`;
     }
 
-    function regionLabelForItem(item) {
-      const regions = Array.isArray(item.locationDistrictNames)
-        ? item.locationDistrictNames
-        : [];
-      if (!regions.length) return "Unknown";
-      return regions[0];
-    }
-
-
     // Map init
     const map = L.map("map", { preferCanvas: true });
     const markerPane = map.createPane("rrfMarkers");
@@ -1547,27 +1538,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     function refreshRecentList() {
       const visible = latestFiltered.filter(r => inMapView(r));
       renderRecentList(visible);
-    }
-
-    function buildCarrierGroupsFromItems(itemsList) {
-      const carrierMap = new Map();
-      itemsList.forEach(item => {
-        const carrierKey = item.carrierKey || "unknown";
-        if (!carrierMap.has(carrierKey)) {
-          carrierMap.set(carrierKey, {
-            carrierKey,
-            carrierFriendly: item.carrierFriendly,
-            carrierColor: item.carrierColor,
-            items: []
-          });
-        }
-        carrierMap.get(carrierKey).items.push(item);
-      });
-      return [...carrierMap.values()].sort((a, b) => {
-        const aLabel = safe(a.carrierFriendly || a.carrierKey);
-        const bLabel = safe(b.carrierFriendly || b.carrierKey);
-        return aLabel.localeCompare(bLabel);
-      });
     }
 
     function formatDateRangeLabel(fromDate, toDate) {
