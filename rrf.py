@@ -446,6 +446,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         throw new Error(`Failed to load data (${response.status}).`);
       }
       DATA = await response.json();
+      DATA = DATA.filter(record => carrierKeyFromLicensee(record.licensee) !== "uber");
 
     // UI-only transforms (do not store in JSON)
     const DISTRICT_NAMES = {
