@@ -1413,10 +1413,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         const color = g.carrierColor || "#666";
         const m = L.circleMarker([g.lat, g.lon], {
           radius: 6,
-          color: color,
+          color: "#000000",
           fillColor: color,
-          fillOpacity: 0.9,
-          weight: 2
+          fillOpacity: 1,
+          opacity: 1,
+          weight: 3
         });
         m.on("click", () => {
           // consolidated view always; single auto-expands inside renderDetailSelection
