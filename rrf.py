@@ -517,6 +517,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     // Map init
     const map = L.map("map", { preferCanvas: true });
     const markerRenderer = L.canvas({ padding: 0.5 });
+    const addressLinePane = map.createPane("addressLines");
+    addressLinePane.style.pointerEvents = "none";
+    addressLinePane.style.zIndex = 400;
     const baseLayers = {
       "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -624,7 +627,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           color,
           weight: 3,
           opacity: 0.9,
-          dashArray: "4 6"
+          dashArray: "4 6",
+          interactive: false,
+          pane: "addressLines"
         }).addTo(addressLineLayer);
         return;
       }
@@ -637,7 +642,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           color,
           weight: 3,
           opacity: 0.9,
-          dashArray: "4 6"
+          dashArray: "4 6",
+          interactive: false,
+          pane: "addressLines"
         }).addTo(addressLineLayer);
       });
     }
