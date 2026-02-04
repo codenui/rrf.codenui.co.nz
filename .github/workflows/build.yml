@@ -49,7 +49,7 @@ jobs:
             echo "stage=index.html" >> "$GITHUB_OUTPUT"
             echo "msg=Rebuild HTML (post-merge)" >> "$GITHUB_OUTPUT"
           else
-            echo "args=--page-size 5000 --max-pages 50" >> "$GITHUB_OUTPUT"
+            echo "args=--fetch --page-size 5000 --max-pages 50" >> "$GITHUB_OUTPUT"
             echo "stage=index.html rrf_licences.json" >> "$GITHUB_OUTPUT"
             echo "msg=Update RRF outputs (daily)" >> "$GITHUB_OUTPUT"
           fi
