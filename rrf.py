@@ -673,6 +673,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       const latLon = parseLatLon(query);
       if (latLon) {
         zoomToAddress(latLon.lat, latLon.lon);
+        drawNearestCarrierLines(latLon.lat, latLon.lon);
         return;
       }
 
@@ -693,6 +694,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           return;
         }
         zoomToAddress(lat, lon);
+        drawNearestCarrierLines(lat, lon);
       } catch (err) {
       }
     }
