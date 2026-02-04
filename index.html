@@ -361,6 +361,7 @@
     }
 
     let markersLayer = L.layerGroup().addTo(map);
+    let addressLineLayer = L.layerGroup().addTo(map);
     let addressMarker = null;
     let addressSuggestTimer = null;
     let addressSuggestController = null;
@@ -373,6 +374,42 @@
         addressMarker.remove();
       }
       addressMarker = L.marker(coords).addTo(map);
+    }
+
+    function clearAddressLines() {
+      addressLineLayer.clearLayers();
+    }
+
+    function drawNearestCarrierLines(lat, lon) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      clearAddressLines();
+      const carriers = ["2degrees", "one", "spark"];
+      const start = L.latLng(lat, lon);
+
+      carriers.forEach((carrierKey) => {
+        let best = null;
+        let bestDist = Infinity;
+        latestFiltered
+          .filter(r => r.lat && r.lon && r.carrierKey === carrierKey)
+          .forEach(r => {
+            const dLat = r.lat - lat;
+            const dLon = r.lon - lon;
+            const dist = (dLat * dLat) + (dLon * dLon);
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = r;
+            }
+          });
+        if (!best) return;
+        const color = best.carrierColor || (CARRIERS[carrierKey]?.color ?? "#666666");
+        const end = L.latLng(best.lat, best.lon);
+        L.polyline([start, end], {
+          color,
+          weight: 3,
+          opacity: 0.9,
+          dashArray: "4 6"
+        }).addTo(addressLineLayer);
+      });
     }
 
     function hideAddressSuggestions() {
@@ -558,6 +595,7 @@
         }
       });
       qAddress.addEventListener("input", () => {
+        clearAddressLines();
         const query = qAddress.value.trim();
         if (addressSuggestTimer) {
           clearTimeout(addressSuggestTimer);
@@ -596,6 +634,7 @@
         qAddress.value = result.display_name || qAddress.value;
         hideAddressSuggestions();
         zoomToAddress(lat, lon);
+        drawNearestCarrierLines(lat, lon);
       });
     }
 
@@ -698,7 +737,7 @@
             else carrierSelected.add(key);
           }
           syncCarrierButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         return btn;
@@ -774,7 +813,7 @@
           }
 
           syncBandButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         bandBtns.appendChild(btn);
@@ -1107,7 +1146,9 @@
 
           renderDetailSelection(sel);
           openFiltersIfMobile();
-          if (r.lat && r.lon) map.setView([r.lat, r.lon], 12);
+          if (r.lat && r.lon) {
+            map.setView([r.lat, r.lon], map.getZoom());
+          }
         });
 
         recentList.appendChild(div);
@@ -1129,7 +1170,8 @@
       renderRecentList(visible);
     }
 
-    function refresh() {
+    function refresh({ preserveView = false } = {}) {
+      clearAddressLines();
       const f = getFilters();
 
       // Apply ONLY non-carrier/non-band filters first
@@ -1196,10 +1238,11 @@
         const color = g.carrierColor || "#666";
         const m = L.circleMarker([g.lat, g.lon], {
           radius: 6,
-          color: color,
+          color: "#000000",
           fillColor: color,
-          fillOpacity: 0.9,
-          weight: 2
+          fillOpacity: 1,
+          opacity: 1,
+          weight: 3
         });
         m.on("click", () => {
           // consolidated view always; single auto-expands inside renderDetailSelection
@@ -1209,7 +1252,7 @@
         m.addTo(markersLayer);
       });
 
-      if (withCoords.length > 0 && withCoords.length < 2000) {
+      if (!preserveView && withCoords.length > 0 && withCoords.length < 2000) {
         const b = L.latLngBounds(withCoords.map(r => [r.lat, r.lon]));
         map.fitBounds(b.pad(0.2));
       }

@@ -582,7 +582,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       clearAddressLines();
       const carriers = ["2degrees", "one", "spark"];
       const start = L.latLng(lat, lon);
-      const bounds = L.latLngBounds([start]);
 
       carriers.forEach((carrierKey) => {
         let best = null;
@@ -601,7 +600,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         if (!best) return;
         const color = best.carrierColor || (CARRIERS[carrierKey]?.color ?? "#666666");
         const end = L.latLng(best.lat, best.lon);
-        bounds.extend(end);
         L.polyline([start, end], {
           color,
           weight: 3,
@@ -609,10 +607,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           dashArray: "4 6"
         }).addTo(addressLineLayer);
       });
-
-      if (bounds.isValid()) {
-        map.fitBounds(bounds.pad(0.2));
-      }
     }
 
     function hideAddressSuggestions() {
@@ -942,7 +936,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             else carrierSelected.add(key);
           }
           syncCarrierButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         return btn;
@@ -1018,7 +1012,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           }
 
           syncBandButtons();
-          refresh();
+          refresh({ preserveView: true });
         });
 
         bandBtns.appendChild(btn);
@@ -1351,7 +1345,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
           renderDetailSelection(sel);
           openFiltersIfMobile();
-          if (r.lat && r.lon) map.setView([r.lat, r.lon], 12);
+          if (r.lat && r.lon) {
+            map.setView([r.lat, r.lon], map.getZoom());
+          }
         });
 
         recentList.appendChild(div);
@@ -1373,7 +1369,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       renderRecentList(visible);
     }
 
-    function refresh() {
+    function refresh({ preserveView = false } = {}) {
       clearAddressLines();
       const f = getFilters();
 
@@ -1441,10 +1437,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         const color = g.carrierColor || "#666";
         const m = L.circleMarker([g.lat, g.lon], {
           radius: 6,
-          color: color,
+          color: "#000000",
           fillColor: color,
-          fillOpacity: 0.9,
-          weight: 2
+          fillOpacity: 1,
+          opacity: 1,
+          weight: 3
         });
         m.on("click", () => {
           // consolidated view always; single auto-expands inside renderDetailSelection
@@ -1454,7 +1451,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         m.addTo(markersLayer);
       });
 
-      if (withCoords.length > 0 && withCoords.length < 2000) {
+      if (!preserveView && withCoords.length > 0 && withCoords.length < 2000) {
         const b = L.latLngBounds(withCoords.map(r => [r.lat, r.lon]));
         map.fitBounds(b.pad(0.2));
       }
