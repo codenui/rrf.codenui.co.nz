@@ -34,7 +34,7 @@ except Exception:
     Transformer = None  # pyproj is optional
 
 
-API_URL = "https://rrf.rsm.govt.nz/api/search/licence"
+API_URL = "https://rrf.rsm.govt.nz/api/public_search/licence"
 
 
 # ---- Band classification -----------------------------------------------------
@@ -104,7 +104,19 @@ def post_page(
     last_err: Optional[Exception] = None
     for attempt in range(1, retries + 1):
         try:
-            r = session.post(API_URL, headers=headers, json=payload, timeout=timeout)
+            #proxies = {
+            #    "http": "http://localhost:8888",
+            #    "https": "http://localhost:8888",  # still use http unless your proxy supports https CONNECT
+            #}
+
+            r = session.post(
+                API_URL,
+                headers=headers,
+                json=payload,
+                timeout=timeout,
+                #proxies=proxies,
+                #verify=False,
+            )
             if r.status_code == 401:
                 raise RuntimeError("401 Unauthorized (endpoint may now require auth or request was blocked).")
             if r.status_code >= 400:
@@ -1229,7 +1241,7 @@ def main() -> int:
     ap.add_argument(
         "--page-size",
         type=int,
-        default=200,
+        default=5000,
         help="Items per page (try 200; server may cap)",
     )
     ap.add_argument(
