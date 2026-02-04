@@ -1088,8 +1088,19 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       if (carrierSection) carrierSection.style.display = "none";
       if (bandSection) bandSection.style.display = "none";
 
+      const carrierGroups = sel.carrierGroups && sel.carrierGroups.length
+        ? sel.carrierGroups
+        : [{
+          carrierKey: sel.items[0]?.carrierKey,
+          carrierFriendly: sel.items[0]?.carrierFriendly,
+          carrierColor: sel.items[0]?.carrierColor,
+          items: sel.items
+        }];
+
+      const items = carrierGroups.flatMap(group => group.items);
+
       // stable sorting: frequency asc then licenceNo
-      const items = [...sel.items].sort((a, b) => {
+      const sortedItems = [...items].sort((a, b) => {
         const fa = Number(a.refFrequencyMHz);
         const fb = Number(b.refFrequencyMHz);
         const hasFa = Number.isFinite(fa);
@@ -1099,10 +1110,12 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         return safe(a.licenceNo).localeCompare(safe(b.licenceNo));
       });
 
-      const first = items[0];
+      const first = sortedItems[0];
       const districts = (first.locationDistrictNames || first.locationDistrictCodes || []).join(", ");
       const siteLabel = safe(first.location) || "Site";
-      const count = items.length;
+      const count = sortedItems.length;
+      const carrierCount = carrierGroups.length;
+      const nearbySuffix = carrierCount > 1 ? " (nearby carriers within 50m)" : "";
 
       const accId = `acc_${safe(first.carrierKey)}_${Number(sel.lat ?? first.lat).toFixed(6)}_${Number(sel.lon ?? first.lon).toFixed(6)}`
         .replace(/[^a-zA-Z0-9_]/g, "_");
@@ -1185,8 +1198,36 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         `;
       }
 
-      const rows = items
-        .map((r, i) => renderRow(r, i, count === 1)) // auto-expand only when single licence
+      function renderCarrierSection(group, groupIndex) {
+        const groupItems = [...group.items].sort((a, b) => {
+          const fa = Number(a.refFrequencyMHz);
+          const fb = Number(b.refFrequencyMHz);
+          const hasFa = Number.isFinite(fa);
+          const hasFb = Number.isFinite(fb);
+          if (hasFa && hasFb && fa !== fb) return fa - fb;
+          if (hasFa !== hasFb) return hasFa ? -1 : 1;
+          return safe(a.licenceNo).localeCompare(safe(b.licenceNo));
+        });
+        const groupAccId = `${accId}_g_${groupIndex}`.replace(/[^a-zA-Z0-9_]/g, "_");
+        const rows = groupItems
+          .map((r, i) => renderRow(r, i, count === 1))
+          .join("");
+        return `
+          <div class="mb-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="swatch-dot" style="background:${safe(group.carrierColor || "#666")}"></span>
+              <div class="fw-semibold">${safe(group.carrierFriendly || group.carrierKey || "Unknown")}</div>
+              <span class="ms-auto badge text-bg-light">${groupItems.length} licence(s)</span>
+            </div>
+            <div class="accordion" id="${groupAccId}">
+              ${rows}
+            </div>
+          </div>
+        `;
+      }
+
+      const carrierSections = carrierGroups
+        .map((group, idx) => renderCarrierSection(group, idx))
         .join("");
 
       detailCard.className = "";
@@ -1196,11 +1237,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             <div class="d-flex align-items-start gap-3">
               <div class="rounded-4 p-2 text-white"
                    style="background:${safe(first.carrierColor)}; height:44px; display:flex; align-items:center; justify-content:center;">
-                <span class="fw-bold" style="text-align:center;">${safe(first.carrierFriendly)}</span>
+                <span class="fw-bold" style="text-align:center;">${carrierCount > 1 ? "Multiple" : safe(first.carrierFriendly)}</span>
               </div>
 
               <div class="flex-grow-1">
-                <div class="fw-semibold fs-6 mb-0">${siteLabel}</div>
+                <div class="fw-semibold fs-6 mb-0">${siteLabel}${nearbySuffix}</div>
                 <div class="text-secondary small">${safe(districts)}</div>
               </div>
 
@@ -1217,8 +1258,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           </div>
         </div>
 
-        <div class="accordion mt-3" id="${accId}">
-          ${rows}
+        <div class="mt-3" id="${accId}">
+          ${carrierSections}
         </div>
       `;
 
@@ -1366,10 +1407,19 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           const lon = Number(r.lon);
           const key = `${ck}|${lat.toFixed(6)}|${lon.toFixed(6)}`;
           const g = currentGroups.get(key);
+          const cluster = currentClustersByGroupKey.get(key);
 
-          const sel = g
-            ? { ...g, activeId: String(r.id) }
-            : { lat: r.lat, lon: r.lon, items: [r], activeId: String(r.id) };
+          const sel = cluster
+            ? {
+              lat: r.lat,
+              lon: r.lon,
+              items: cluster.items,
+              carrierGroups: cluster.carrierGroups,
+              activeId: String(r.id)
+            }
+            : g
+              ? { ...g, activeId: String(r.id) }
+              : { lat: r.lat, lon: r.lon, items: [r], activeId: String(r.id) };
 
           renderDetailSelection(sel);
           openFiltersIfMobile();
@@ -1384,6 +1434,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     
     // stash latest grouping so other UI (eg recent list clicks) can open the full group
     let currentGroups = new Map();
+    let currentClustersByGroupKey = new Map();
     let latestFiltered = [];
     
     function inMapView(r) {
@@ -1445,6 +1496,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
         if (!groups.has(key)) {
           groups.set(key, {
+            key,
             carrierKey: ck,
             carrierFriendly: r.carrierFriendly,
             carrierColor: r.carrierColor,
@@ -1460,6 +1512,74 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       currentGroups = groups;
 
       const groupList = [...groups.values()];
+
+      function distanceMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = Math.PI / 180;
+        const dLat = (lat2 - lat1) * toRad;
+        const dLon = (lon2 - lon1) * toRad;
+        const a = Math.sin(dLat / 2) ** 2
+          + Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(a));
+      }
+
+      const clusterByGroupKey = new Map();
+      const clusters = [];
+      const unassigned = new Set(groupList.map(g => g.key));
+      const groupsByKey = new Map(groupList.map(g => [g.key, g]));
+
+      while (unassigned.size > 0) {
+        const seedKey = unassigned.values().next().value;
+        const seed = groupsByKey.get(seedKey);
+        if (!seed) {
+          unassigned.delete(seedKey);
+          continue;
+        }
+        const clusterGroups = [];
+        const queue = [seed];
+        unassigned.delete(seedKey);
+        while (queue.length) {
+          const current = queue.pop();
+          clusterGroups.push(current);
+          [...unassigned].forEach((candidateKey) => {
+            const candidate = groupsByKey.get(candidateKey);
+            if (!candidate) return;
+            const d = distanceMeters(current.lat, current.lon, candidate.lat, candidate.lon);
+            if (d <= 50) {
+              unassigned.delete(candidateKey);
+              queue.push(candidate);
+            }
+          });
+        }
+        const carrierMap = new Map();
+        clusterGroups.forEach(group => {
+          const carrierKey = group.carrierKey || "unknown";
+          if (!carrierMap.has(carrierKey)) {
+            carrierMap.set(carrierKey, {
+              carrierKey,
+              carrierFriendly: group.carrierFriendly,
+              carrierColor: group.carrierColor,
+              items: []
+            });
+          }
+          carrierMap.get(carrierKey).items.push(...group.items);
+        });
+        const carrierGroups = [...carrierMap.values()].sort((a, b) => {
+          const aLabel = safe(a.carrierFriendly || a.carrierKey);
+          const bLabel = safe(b.carrierFriendly || b.carrierKey);
+          return aLabel.localeCompare(bLabel);
+        });
+        const items = clusterGroups.flatMap(group => group.items);
+        const cluster = {
+          groups: clusterGroups,
+          items,
+          carrierGroups
+        };
+        clusterGroups.forEach(group => clusterByGroupKey.set(group.key, cluster));
+        clusters.push(cluster);
+      }
+
+      currentClustersByGroupKey = clusterByGroupKey;
 
       const locationBuckets = new Map();
       groupList.forEach(g => {
@@ -1498,8 +1618,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             weight: 3
           });
           m.on("click", () => {
+            const cluster = clusterByGroupKey.get(g.key);
+            const selection = cluster
+              ? {
+                lat: g.lat,
+                lon: g.lon,
+                items: cluster.items,
+                carrierGroups: cluster.carrierGroups
+              }
+              : g;
             // consolidated view always; single auto-expands inside renderDetailSelection
-            renderDetailSelection(g);
+            renderDetailSelection(selection);
             openFiltersIfMobile();
           });
           m.addTo(markersLayer);
