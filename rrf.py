@@ -580,10 +580,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     function drawNearestCarrierLines(lat, lon) {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
       clearAddressLines();
-      const carriers = ["2degrees", "one", "spark"];
       const start = L.latLng(lat, lon);
 
-      carriers.forEach((carrierKey) => {
+      const primaryCarriers = ["2degrees", "one", "spark"];
+
+      function findNearest(carrierKey) {
         let best = null;
         let bestDist = Infinity;
         latestFiltered
@@ -597,8 +598,35 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               best = r;
             }
           });
-        if (!best) return;
-        const color = best.carrierColor || (CARRIERS[carrierKey]?.color ?? "#666666");
+        return best ? { record: best, distance: bestDist } : null;
+      }
+
+      const primaryNearest = primaryCarriers
+        .map(key => ({ key, result: findNearest(key) }))
+        .filter(item => item.result);
+
+      const rcgNearest = findNearest("rcg");
+      const closestPrimary = primaryNearest.reduce(
+        (best, item) => (!best || item.result.distance < best.distance ? item.result : best),
+        null
+      );
+
+      if (rcgNearest && (!closestPrimary || rcgNearest.distance < closestPrimary.distance)) {
+        const best = rcgNearest.record;
+        const color = best.carrierColor || (CARRIERS.rcg?.color ?? "#666666");
+        const end = L.latLng(best.lat, best.lon);
+        L.polyline([start, end], {
+          color,
+          weight: 3,
+          opacity: 0.9,
+          dashArray: "4 6"
+        }).addTo(addressLineLayer);
+        return;
+      }
+
+      primaryNearest.forEach(({ key, result }) => {
+        const best = result.record;
+        const color = best.carrierColor || (CARRIERS[key]?.color ?? "#666666");
         const end = L.latLng(best.lat, best.lon);
         L.polyline([start, end], {
           color,
@@ -673,6 +701,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       const latLon = parseLatLon(query);
       if (latLon) {
         zoomToAddress(latLon.lat, latLon.lon);
+        drawNearestCarrierLines(latLon.lat, latLon.lon);
         return;
       }
 
@@ -693,6 +722,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           return;
         }
         zoomToAddress(lat, lon);
+        drawNearestCarrierLines(lat, lon);
       } catch (err) {
       }
     }
@@ -1393,7 +1423,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
           renderDetailSelection(sel);
           openFiltersIfMobile();
-          if (r.lat && r.lon) map.setView([r.lat, r.lon], 12);
+          if (r.lat && r.lon) {
+            map.setView([r.lat, r.lon], map.getZoom());
+          }
         });
 
         recentList.appendChild(div);
