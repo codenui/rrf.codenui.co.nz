@@ -1,4 +1,4 @@
-name: RRF daily build (commit to main)
+name: Daily build
 
 on:
   schedule:
@@ -36,7 +36,7 @@ jobs:
 
       - name: Run rrf.py
         run: |
-          python rrf.py --page-size 200 --max-pages 50
+          python rrf.py --page-size 5000 --max-pages 50
 
           # If your script outputs rrf_map.html, publish it as index.html
           if [ -f rrf_map.html ]; then
