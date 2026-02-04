@@ -517,6 +517,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
     const regionSection = document.getElementById("regionSection");
+    const carrierSection = document.getElementById("carrierSection");
+    const bandSection = document.getElementById("bandSection");
     
     // District dropdown options
     function populateDistricts() {
@@ -748,11 +750,15 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         detailCard.innerHTML = "Click a marker (or a recent item) to see details.";
         if (recentSection) recentSection.style.display = "";
         if (regionSection) regionSection.style.display = "";
+        if (carrierSection) carrierSection.style.display = "";
+        if (bandSection) bandSection.style.display = "";
         return;
       }
 
       if (recentSection) recentSection.style.display = "none";
       if (regionSection) regionSection.style.display = "none";
+      if (carrierSection) carrierSection.style.display = "none";
+      if (bandSection) bandSection.style.display = "none";
 
       // stable sorting: frequency asc then licenceNo
       const items = [...sel.items].sort((a, b) => {
@@ -1137,14 +1143,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="carrierSection">
     <div class="card-body">
       <div class="fw-semibold mb-2">Carriers</div>
       <div class="btn-group gap-2 flex-wrap" role="group" aria-label="Carriers" id="carrierBtns"></div>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="bandSection">
     <div class="card-body">
         <div class="fw-semibold mb-2">Bands</div>
         <div class="btn-group gap-2 flex-wrap" role="group" aria-label="Bands" id="bandBtns"></div>
