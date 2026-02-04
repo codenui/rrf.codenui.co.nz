@@ -350,6 +350,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     .card { border-radius: unset; }
 
+    .offcanvas-lg .offcanvas-body { display: unset; }
+
     .map-style-control {
       background: rgba(255, 255, 255, 0.95);
       border-radius: 0.25rem;
