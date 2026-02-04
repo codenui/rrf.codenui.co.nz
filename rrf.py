@@ -513,16 +513,16 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     // Map init
     const map = L.map("map");
     const baseLayers = {
-      Terrain: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
-        maxZoom: 17,
-        attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
-      }),
-      Streets: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
+      }),
+      "Topographic": L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+        maxZoom: 17,
+        attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
       })
     };
-    baseLayers.Terrain.addTo(map);
+    baseLayers.OpenStreetMap.addTo(map);
     map.setView([-41.2, 174.7], 5);
 
     const MapStyleControl = L.Control.extend({
@@ -543,7 +543,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     const mapStyleSelect = document.getElementById("mapStyleSelect");
     if (mapStyleSelect) {
-      mapStyleSelect.value = "Terrain";
+      mapStyleSelect.value = "OpenStreetMap";
       mapStyleSelect.addEventListener("change", (event) => {
         const selected = event.target.value;
         Object.entries(baseLayers).forEach(([name, layer]) => {
