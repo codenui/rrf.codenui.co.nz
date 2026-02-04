@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -66,25 +65,6 @@ def classify_band(mhz: Optional[float]) -> str:
     return "other"
 
 
-def carrier_key_from_licensee(licensee: Optional[str]) -> str:
-    if not licensee:
-        return "unknown"
-    s = licensee.upper()
-    if "TWO DEGREES" in s:
-        return "2degrees"
-    if "SPARK" in s:
-        return "spark"
-    if "ONE NEW ZEALAND" in s or "ONE NZ" in s or "VODAFONE" in s:
-        return "one"
-    if "RURAL" in s:
-        return "rcg"
-    if "TŪ ĀTEA" in s or "TU ATEA" in s:
-        return "tuatea"
-    if "UBER" in s:
-        return "uber"
-    return "unknown"
-
-
 # ---- HTTP + pagination -------------------------------------------------------
 
 
@@ -108,18 +88,11 @@ def post_page(
     last_err: Optional[Exception] = None
     for attempt in range(1, retries + 1):
         try:
-            #proxies = {
-            #    "http": "http://localhost:8888",
-            #    "https": "http://localhost:8888",  # still use http unless your proxy supports https CONNECT
-            #}
-
             r = session.post(
                 API_URL,
                 headers=headers,
                 json=payload,
                 timeout=timeout,
-                #proxies=proxies,
-                #verify=False,
             )
             if r.status_code == 401:
                 raise RuntimeError("401 Unauthorized (endpoint may now require auth or request was blocked).")
@@ -345,24 +318,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       #map, #filtersCanvas { height: calc(100dvh - var(--nav-h)); }
     }
 
-    /* Desktop: full height */
-    /*
-    @media (min-width: 992px) {
-      #map { height: 100vh; }
-    }
-    */
-    
     .offcanvas-lg { overflow: scroll; }
     
     .swatch-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
-
-    /* make the filters pane scroll nicely on desktop */
-    /*
-    @media (min-width: 992px) {
-      #filtersCanvas { height: 100vh; }
-      #filtersCanvas .offcanvas-body { height: 100vh; overflow: auto; }
-    }
-    */
 
     .card { border-radius: unset; }
 
@@ -556,15 +514,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       const display = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
       return `${display} MHz`;
     }
-
-    function regionLabelForItem(item) {
-      const regions = Array.isArray(item.locationDistrictNames)
-        ? item.locationDistrictNames
-        : [];
-      if (!regions.length) return "Unknown";
-      return regions[0];
-    }
-
 
     // Map init
     const map = L.map("map", { preferCanvas: true });
@@ -1589,27 +1538,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     function refreshRecentList() {
       const visible = latestFiltered.filter(r => inMapView(r));
       renderRecentList(visible);
-    }
-
-    function buildCarrierGroupsFromItems(itemsList) {
-      const carrierMap = new Map();
-      itemsList.forEach(item => {
-        const carrierKey = item.carrierKey || "unknown";
-        if (!carrierMap.has(carrierKey)) {
-          carrierMap.set(carrierKey, {
-            carrierKey,
-            carrierFriendly: item.carrierFriendly,
-            carrierColor: item.carrierColor,
-            items: []
-          });
-        }
-        carrierMap.get(carrierKey).items.push(item);
-      });
-      return [...carrierMap.values()].sort((a, b) => {
-        const aLabel = safe(a.carrierFriendly || a.carrierKey);
-        const bLabel = safe(b.carrierFriendly || b.carrierKey);
-        return aLabel.localeCompare(bLabel);
-      });
     }
 
     function formatDateRangeLabel(fromDate, toDate) {
