@@ -466,12 +466,22 @@
       addressSuggestions.classList.remove("d-none");
     }
 
+    const NOMINATIM_DEFAULTS = "countrycodes=nz&addressdetails=1&viewbox=166,-33,179,-48&bounded=1";
+
+    function buildNominatimUrl(query, limit) {
+      const params = new URLSearchParams(NOMINATIM_DEFAULTS);
+      params.set("format", "json");
+      params.set("limit", String(limit));
+      params.set("q", query);
+      return `https://nominatim.openstreetmap.org/search?${params.toString()}`;
+    }
+
     async function fetchAddressSuggestions(query) {
       if (addressSuggestController) {
         addressSuggestController.abort();
       }
       addressSuggestController = new AbortController();
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(query)}`;
+      const url = buildNominatimUrl(query, 6);
       const response = await fetch(url, {
         headers: { Accept: "application/json" },
         signal: addressSuggestController.signal
@@ -509,7 +519,7 @@
       }
 
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+        const url = buildNominatimUrl(query, 1);
         const response = await fetch(url, { headers: { Accept: "application/json" } });
         if (!response.ok) {
           throw new Error("Unable to reach search service.");
