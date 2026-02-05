@@ -674,15 +674,16 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       if (!candidates.length) return [];
 
       const origin = L.latLng(lat, lon);
-      const uniqueSites = new Map();
+      const siteCandidates = [];
       candidates.forEach(r => {
         if (!r || !r._hasCoords) return;
         const locationName = safe(r.location).trim().toUpperCase();
         const siteKey = `${key}|${r._lat.toFixed(6)}|${r._lon.toFixed(6)}|${locationName}`;
-        if (excludedSiteKeys.has(siteKey) || uniqueSites.has(siteKey)) return;
+        if (excludedSiteKeys.has(siteKey)) return;
         const target = L.latLng(r._lat, r._lon);
-        uniqueSites.set(siteKey, {
+        siteCandidates.push({
           siteKey,
+          locationName,
           location: safe(r.location) || "Unknown site",
           lat: r._lat,
           lon: r._lon,
@@ -690,9 +691,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         });
       });
 
-      return [...uniqueSites.values()]
+      const seenNames = new Set();
+      const uniqueByName = [];
+      siteCandidates
         .sort((a, b) => a.meters - b.meters)
-        .slice(0, limit);
+        .forEach(site => {
+          if (seenNames.has(site.locationName)) return;
+          seenNames.add(site.locationName);
+          uniqueByName.push(site);
+        });
+
+      return uniqueByName.slice(0, limit);
     }
 
     function drawNearestCarrierLines(lat, lon) {
