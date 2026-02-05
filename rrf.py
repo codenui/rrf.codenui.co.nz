@@ -1455,7 +1455,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             <div class="accordion" id="${groupAccId}">
               ${rows}
             </div>
-            ${nearestSection}
           </div>
         `;
       }
