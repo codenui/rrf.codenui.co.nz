@@ -819,6 +819,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const recentList = document.getElementById("recentList");
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
+    const overviewSection = document.getElementById("overviewSection");
     const regionSection = document.getElementById("regionSection");
     const geoLocateBtn = document.getElementById("geoLocateBtn");
     const activeFilters = document.getElementById("activeFilters");
@@ -1157,6 +1158,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         detailCard.className = "text-secondary";
         detailCard.innerHTML = "Click a marker (or a recent item) to see details.";
         if (recentSection) recentSection.style.display = "";
+        if (overviewSection) overviewSection.style.display = "";
         if (regionSection) regionSection.style.display = "";
         if (carrierSection) carrierSection.style.display = "";
         if (bandSection) bandSection.style.display = "";
@@ -1164,6 +1166,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       }
 
       if (recentSection) recentSection.style.display = "none";
+      if (overviewSection) overviewSection.style.display = "none";
       if (regionSection) regionSection.style.display = "none";
       if (carrierSection) carrierSection.style.display = "none";
       if (bandSection) bandSection.style.display = "none";
