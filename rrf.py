@@ -646,9 +646,15 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     let addressSuggestTimer = null;
     let addressSuggestController = null;
     let addressSuggestionsCache = [];
+    const LOCATION_FOCUS_ZOOM = 15;
+
+    function focusMapOnLocation(lat, lon) {
+      map.setView([lat, lon], LOCATION_FOCUS_ZOOM);
+    }
+
     function zoomToAddress(lat, lon) {
       const coords = [lat, lon];
-      map.setView(coords, 15);
+      focusMapOnLocation(lat, lon);
       if (addressMarker) {
         addressMarker.remove();
       }
@@ -956,7 +962,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               renderer: markerRenderer
             }).addTo(map);
           }
-          map.setView([latitude, longitude], 12);
+          focusMapOnLocation(latitude, longitude);
           drawNearestCarrierLines(latitude, longitude);
           closeFiltersIfMobile();
         },
@@ -1495,7 +1501,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       document.getElementById("clearDetailBtn")?.addEventListener("click", () => renderDetailSelection(null));
       document.getElementById("zoomSiteBtn")?.addEventListener("click", () => {
         const r0 = items[0];
-        if (r0.lat && r0.lon) map.setView([r0.lat, r0.lon], 12);
+        if (r0.lat && r0.lon) focusMapOnLocation(r0.lat, r0.lon);
       });
 
       // wire per-row zoom buttons
@@ -1503,7 +1509,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         btn.addEventListener("click", () => {
           const idx = Number(btn.getAttribute("data-zoom"));
           const rr = items[idx];
-          if (rr && rr.lat && rr.lon) map.setView([rr.lat, rr.lon], 12);
+          if (rr && rr.lat && rr.lon) focusMapOnLocation(rr.lat, rr.lon);
         });
       });
 
@@ -1537,7 +1543,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             items: targetItems,
             carrierGroups: targetCarrierGroups
           });
-          map.setView([lat, lon], Math.max(map.getZoom(), 14));
+          focusMapOnLocation(lat, lon);
           openFiltersIfMobile();
         });
       });
@@ -1676,7 +1682,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           renderDetailSelection(sel);
           openFiltersIfMobile();
           if (r.lat && r.lon) {
-            map.setView([r.lat, r.lon], map.getZoom());
+            focusMapOnLocation(r.lat, r.lon);
           }
         });
 
