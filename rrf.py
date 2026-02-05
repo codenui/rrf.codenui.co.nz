@@ -1451,10 +1451,10 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               <div class="text-truncate">${groupSiteLabel}${nearbySuffix}</div>
               <span class="ms-auto badge text-bg-light">${groupItems.length} licence(s)</span>
             </div>
-            ${nearestSection}
             <div class="accordion" id="${groupAccId}">
               ${rows}
             </div>
+            ${nearestSection}
           </div>
         `;
       }
