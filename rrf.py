@@ -463,16 +463,35 @@ def build_html(data: List[Dict[str, Any]]) -> str:
   ></script>
 
   <script>
-    const DATA_URL = "./rrf_licences.json";
+    const DATA_URLS = [
+      "./rrf_licences.json",
+      "https://raw.githubusercontent.com/codenui/rrf.codenui.co.nz/refs/heads/main/rrf_licences.json",
+    ];
     const BAND_DEFS = __BANDS__; // [code,label,[lo,hi]]
     let DATA = [];
 
-    async function init() {
-      const response = await fetch(DATA_URL, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`Failed to load data (${response.status}).`);
+    async function loadDataWithFallback() {
+      const failures = [];
+      for (const url of DATA_URLS) {
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) {
+            failures.push(`${url} -> HTTP ${response.status}`);
+            continue;
+          }
+          const rows = await response.json();
+          return { rows, url };
+        } catch (err) {
+          failures.push(`${url} -> ${err?.message || err}`);
+        }
       }
-      DATA = await response.json();
+      throw new Error(`Failed to load data. Tried: ${failures.join(" | ")}`);
+    }
+
+    async function init() {
+      const loaded = await loadDataWithFallback();
+      DATA = loaded.rows;
+      console.info(`Loaded ${DATA.length} records from ${loaded.url}`);
       DATA = DATA.filter(record => carrierKeyFromLicensee(record.licensee) !== "uber");
 
     // UI-only transforms (do not store in JSON)
@@ -1904,7 +1923,8 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
   init().catch(err => {
     console.error("Failed to initialize page data:", err);
-    window.alert(err?.message || "Failed to load data.");
+    const message = err?.message || "Failed to load data.";
+    window.alert(`${message}\nPage URL: ${window.location.href}`);
   });
   </script>
 </body>
