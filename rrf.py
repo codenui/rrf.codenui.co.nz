@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """RRF Licence Search scraper + HTML map generator.
 
-Requirements:
+Requirements (only for --fetch):
   pip install requests
 Optional (recommended for TM2000 -> lat/lon conversion):
   pip install pyproj
@@ -12,6 +12,9 @@ Run:
 HTML-only (no API calls; regenerates ./rrf_map.html from existing JSON):
   python rrf_map.py
   python rrf_map.py --html-only
+
+Preview locally (recommended port for browser-container checks):
+  python -m http.server 4173
 
 Fetch + rebuild JSON/HTML (explicit, since HTML-only is default):
   python rrf_map.py --fetch
@@ -29,7 +32,10 @@ import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import requests
+try:
+    import requests
+except Exception:
+    requests = None  # type: ignore[assignment]
 
 try:
     from pyproj import Transformer  # type: ignore
@@ -112,6 +118,8 @@ def fetch_all(
     max_pages: int = 0,
     sleep_between: float = 0.0,
 ) -> List[Dict[str, Any]]:
+    if requests is None:
+        raise RuntimeError("The 'requests' package is required for --fetch. Install with: pip install requests")
     session = requests.Session()
     headers = build_headers()
 
@@ -417,7 +425,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
   ></script>
 
   <script>
-    const DATA_URL = "https://raw.githubusercontent.com/codenui/rrf.codenui.co.nz/refs/heads/main/rrf_licences.json";
+    const DATA_URL = "./rrf_licences.json";
     const BAND_DEFS = __BANDS__; // [code,label,[lo,hi]]
     let DATA = [];
 
@@ -2050,6 +2058,7 @@ def main() -> int:
 
         print(f"Read {args.json_in} ({len(data)} records)")
         print(f"Wrote {args.html_out}")
+        print("Tip: if Playwright/browser-container shows a generic 'Not Found' on port 8000, serve this folder on another port such as 4173.")
         return 0
 
     # Normal fetch path
