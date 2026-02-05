@@ -553,6 +553,13 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       r.carrierColor = meta.color;
 
       r.locationDistrictNames = districtNamesFromCodes(r.locationDistrictCodes);
+
+      // Cache frequently re-used derived values for faster filtering/search.
+      r._commDate = parseISO(r.commencementDate);
+      r._expDate = r.expiryDate ? parseISO(r.expiryDate + "T00:00:00") : null;
+      r._lat = Number(r.lat);
+      r._lon = Number(r.lon);
+      r._hasCoords = Number.isFinite(r._lat) && Number.isFinite(r._lon);
     });
 
     function parseDate(value) {
@@ -669,19 +676,18 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       const primaryCarriers = ["2degrees", "one", "spark"];
 
       function findNearest(carrierKey) {
+        const candidates = nearestCandidatesByCarrier.get(carrierKey) || [];
         let best = null;
         let bestDist = Infinity;
-        latestFiltered
-          .filter(r => r.lat && r.lon && r.carrierKey === carrierKey)
-          .forEach(r => {
-            const dLat = r.lat - lat;
-            const dLon = r.lon - lon;
-            const dist = (dLat * dLat) + (dLon * dLon);
-            if (dist < bestDist) {
-              bestDist = dist;
-              best = r;
-            }
-          });
+        candidates.forEach(r => {
+          const dLat = r._lat - lat;
+          const dLon = r._lon - lon;
+          const dist = (dLat * dLat) + (dLon * dLon);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = r;
+          }
+        });
         return best ? { record: best, distance: bestDist } : null;
       }
 
@@ -1453,12 +1459,12 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         if (!ds.includes(f.district)) return false;
       }
 
-      const c = parseISO(r.commencementDate);
+      const c = r._commDate;
       if ((f.commFrom || f.commTo) && !c) return false;
       if (f.commFrom && c < f.commFrom) return false;
       if (f.commTo && c > f.commTo) return false;
 
-      const e = r.expiryDate ? parseISO(r.expiryDate + "T00:00:00") : null;
+      const e = r._expDate;
       if ((f.expFrom || f.expTo) && !e) return false;
       if (f.expFrom && e < f.expFrom) return false;
       if (f.expTo && e > f.expTo) return false;
@@ -1480,38 +1486,6 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       return true;
     }
 
-    function passesFilters(r, f) {
-      if (f.locationText) {
-        const loc = (r.location || "").toLowerCase();
-        if (!loc.includes(f.locationText)) return false;
-      }
-
-      if (f.district) {
-        const ds = r.locationDistrictCodes || [];
-        if (!ds.includes(f.district)) return false;
-      }
-
-      // Carriers: selected empty => show all
-      const k = r.carrierKey || "unknown";
-      if (carrierSelected.size > 0 && !carrierSelected.has(k)) return false;
-
-      // Bands: selected empty => show all
-      const b = r.bandCode || "unknown";
-      if (bandSelected.size > 0 && !bandSelected.has(b)) return false;
-
-      const c = parseISO(r.commencementDate);
-      if ((f.commFrom || f.commTo) && !c) return false;
-      if (f.commFrom && c < f.commFrom) return false;
-      if (f.commTo && c > f.commTo) return false;
-
-      const e = r.expiryDate ? parseISO(r.expiryDate + "T00:00:00") : null;
-      if ((f.expFrom || f.expTo) && !e) return false;
-      if (f.expFrom && e < f.expFrom) return false;
-      if (f.expTo && e > f.expTo) return false;
-
-      return true;
-    }
-    
     function openFiltersIfMobile() {
       // lg breakpoint is 992px in Bootstrap 5
       if (!window.matchMedia("(max-width: 991.98px)").matches) return;
@@ -1544,14 +1518,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       sevenDaysAgo.setDate(now.getDate() - 7);
 
       const recent = filtered.filter((r) => {
-        const commenced = parseISO(r.commencementDate);
+        const commenced = r._commDate;
         if (!commenced) return false;
         return commenced >= sevenDaysAgo && commenced <= now;
       });
 
       const sorted = [...recent].sort((a, b) => {
-        const da = parseISO(a.commencementDate);
-        const db = parseISO(b.commencementDate);
+        const da = a._commDate;
+        const db = b._commDate;
         const ta = da ? da.getTime() : -Infinity;
         const tb = db ? db.getTime() : -Infinity;
         return tb - ta;
@@ -1608,11 +1582,12 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     let currentGroups = new Map();
     let currentClustersByGroupKey = new Map();
     let latestFiltered = [];
+    let nearestCandidatesByCarrier = new Map();
     
     function inMapView(r) {
-      if (!r.lat || !r.lon) return false;
+      if (!r._hasCoords) return false;
       const b = map.getBounds();
-      return b.contains([r.lat, r.lon]);
+      return b.contains([r._lat, r._lon]);
     }
 
     function refreshRecentList() {
@@ -1817,16 +1792,25 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       */
 
       latestFiltered = filtered;
+      nearestCandidatesByCarrier = new Map();
+      latestFiltered.forEach(r => {
+        if (!r._hasCoords) return;
+        const key = r.carrierKey || "unknown";
+        if (!nearestCandidatesByCarrier.has(key)) {
+          nearestCandidatesByCarrier.set(key, []);
+        }
+        nearestCandidatesByCarrier.get(key).push(r);
+      });
       refreshRecentList();
       // group markers by carrier + coordinate so one marker can represent multiple licences
       markersLayer.clearLayers();
-      const withCoords = filtered.filter(r => r.lat && r.lon);
+      const withCoords = filtered.filter(r => r._hasCoords);
 
       const groups = new Map();
       withCoords.forEach(r => {
         const ck = r.carrierKey || "unknown";        
-        const lat = Number(r.lat);
-        const lon = Number(r.lon);
+        const lat = r._lat;
+        const lon = r._lon;
 
         // rounding avoids float equality issues
         const key = `${ck}|${lat.toFixed(6)}|${lon.toFixed(6)}`;
