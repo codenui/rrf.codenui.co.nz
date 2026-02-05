@@ -667,6 +667,43 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       return `${rounded} km`;
     }
 
+    function getNearestSitesForCarrier(lat, lon, carrierKey, excludedSiteKeys = new Set(), limit = 3) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+      const key = carrierKey || "unknown";
+      const candidates = nearestCandidatesByCarrier.get(key) || [];
+      if (!candidates.length) return [];
+
+      const origin = L.latLng(lat, lon);
+      const siteCandidates = [];
+      candidates.forEach(r => {
+        if (!r || !r._hasCoords) return;
+        const locationName = safe(r.location).trim().toUpperCase();
+        const siteKey = `${key}|${r._lat.toFixed(6)}|${r._lon.toFixed(6)}|${locationName}`;
+        if (excludedSiteKeys.has(siteKey)) return;
+        const target = L.latLng(r._lat, r._lon);
+        siteCandidates.push({
+          siteKey,
+          locationName,
+          location: safe(r.location) || "Unknown site",
+          lat: r._lat,
+          lon: r._lon,
+          meters: origin.distanceTo(target)
+        });
+      });
+
+      const seenNames = new Set();
+      const uniqueByName = [];
+      siteCandidates
+        .sort((a, b) => a.meters - b.meters)
+        .forEach(site => {
+          if (seenNames.has(site.locationName)) return;
+          seenNames.add(site.locationName);
+          uniqueByName.push(site);
+        });
+
+      return uniqueByName.slice(0, limit);
+    }
+
     function drawNearestCarrierLines(lat, lon) {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
       clearAddressLines();
@@ -1362,6 +1399,39 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         });
         const groupAccId = `${accId}_g_${groupIndex}`.replace(/[^a-zA-Z0-9_]/g, "_");
         const groupSiteLabel = safe(groupItems[0]?.location) || "Site";
+        const carrierKey = group.carrierKey || groupItems[0]?.carrierKey || "unknown";
+        const excludedSiteKeys = new Set(
+          groupItems
+            .filter(item => item && item._hasCoords)
+            .map(item => `${carrierKey}|${item._lat.toFixed(6)}|${item._lon.toFixed(6)}|${safe(item.location).trim().toUpperCase()}`)
+        );
+        const nearestSites = getNearestSitesForCarrier(
+          lat,
+          lon,
+          carrierKey,
+          excludedSiteKeys,
+          3
+        );
+        const nearestSection = nearestSites.length
+          ? `
+            <div class="border rounded p-2 bg-light-subtle mt-2">
+              <div class="fw-semibold small mb-1">Nearest sites (${nearestSites.length})</div>
+              <div class="small d-flex flex-column gap-1">
+                ${nearestSites.map(site => `
+                  <button type="button" class="btn btn-sm btn-outline-secondary text-start d-flex gap-2 align-items-center nearest-site-btn"
+                          data-nearest-site-key="${safe(site.siteKey)}"
+                          data-nearest-lat="${safe(site.lat)}"
+                          data-nearest-lon="${safe(site.lon)}"
+                          data-nearest-location="${safe(site.location)}"
+                          data-nearest-carrier="${safe(carrierKey)}">
+                    <span class="text-secondary">${formatDistanceLabel(site.meters)}</span>
+                    <span class="text-truncate">${safe(site.location)}</span>
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+          `
+          : "";
         const totalBandwidthMHz = groupItems.reduce((sum, item) => {
           const bw = Number(item.bandwidthMHz);
           return Number.isFinite(bw) ? sum + bw : sum;
@@ -1384,6 +1454,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
             <div class="accordion" id="${groupAccId}">
               ${rows}
             </div>
+            ${nearestSection}
           </div>
         `;
       }
@@ -1433,6 +1504,41 @@ def build_html(data: List[Dict[str, Any]]) -> str:
           const idx = Number(btn.getAttribute("data-zoom"));
           const rr = items[idx];
           if (rr && rr.lat && rr.lon) map.setView([rr.lat, rr.lon], 12);
+        });
+      });
+
+      detailCard.querySelectorAll(".nearest-site-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const carrierKey = btn.getAttribute("data-nearest-carrier") || "unknown";
+          const lat = Number(btn.getAttribute("data-nearest-lat"));
+          const lon = Number(btn.getAttribute("data-nearest-lon"));
+          const locationName = (btn.getAttribute("data-nearest-location") || "").trim().toUpperCase();
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+          const targetItems = latestFiltered.filter(r => {
+            if (!r || !r._hasCoords) return false;
+            const rCarrier = r.carrierKey || "unknown";
+            if (rCarrier !== carrierKey) return false;
+            if (r._lat.toFixed(6) !== lat.toFixed(6) || r._lon.toFixed(6) !== lon.toFixed(6)) return false;
+            return safe(r.location).trim().toUpperCase() === locationName;
+          });
+          if (!targetItems.length) return;
+
+          const targetCarrierGroups = [{
+            carrierKey,
+            carrierFriendly: targetItems[0].carrierFriendly,
+            carrierColor: targetItems[0].carrierColor,
+            items: targetItems
+          }];
+
+          renderDetailSelection({
+            lat,
+            lon,
+            items: targetItems,
+            carrierGroups: targetCarrierGroups
+          });
+          map.setView([lat, lon], Math.max(map.getZoom(), 14));
+          openFiltersIfMobile();
         });
       });
     }
