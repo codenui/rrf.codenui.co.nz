@@ -298,7 +298,15 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9fa" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="RRF Licence Map" />
+  <link rel="manifest" href='data:application/manifest+json,{"name":"RRF Licence Map","short_name":"RRF Map","display":"standalone","background_color":"#121212","theme_color":"#121212","start_url":"./","scope":"./"}' />
   <title>RRF Licence Map</title>
 
   <!-- Bootstrap -->
@@ -314,9 +322,29 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
   <style>
     /* Minimal CSS: only what Bootstrap/Leaflet can't do */
-    html, body { height: 100%; }
-    
-    :root { --nav-h: 0px; }
+    html, body {
+      background: var(--bs-body-bg);
+      color: var(--bs-body-color);
+      height: 100%;
+    }
+
+    :root {
+      --nav-h: 0px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+    }
+
+    body { padding-inline: var(--safe-left) var(--safe-right); }
+
+    .standalone-mode #topbar {
+      padding-top: var(--safe-top);
+    }
+
+    .standalone-mode main {
+      padding-bottom: var(--safe-bottom);
+    }
 
     /* Mobile: account for sticky navbar */
     @media (max-width: 991.98px) {
@@ -335,9 +363,11 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     .offcanvas-lg .offcanvas-body { display: unset; }
 
     .map-style-control {
-      background: rgba(255, 255, 255, 0.95);
+      background: color-mix(in srgb, var(--bs-body-bg) 92%, transparent);
+      border: 1px solid color-mix(in srgb, var(--bs-body-color) 18%, transparent);
       border-radius: 0.25rem;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+      color: var(--bs-body-color);
       padding: 0.5rem;
     }
 
@@ -355,20 +385,20 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
 
     .distance-label.leaflet-tooltip {
-      background: rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(0, 0, 0, 0.2);
+      background: color-mix(in srgb, var(--bs-body-bg) 94%, transparent);
+      border: 1px solid color-mix(in srgb, var(--bs-body-color) 20%, transparent);
       border-radius: 999px;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-      color: #111;
+      color: var(--bs-body-color);
       font-size: 12px;
       font-weight: 600;
       padding: 2px 8px;
     }
 
     #activeFilters .badge {
-      background: #f8f9fa;
-      border: 1px dashed rgba(0, 0, 0, 0.2);
-      color: #212529;
+      background: color-mix(in srgb, var(--bs-body-bg) 86%, var(--bs-emphasis-color) 14%);
+      border: 1px dashed color-mix(in srgb, var(--bs-body-color) 20%, transparent);
+      color: var(--bs-body-color);
       font-weight: 500;
     }
 
@@ -469,6 +499,25 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     ];
     const BAND_DEFS = __BANDS__; // [code,label,[lo,hi]]
     let DATA = [];
+
+    const prefersDarkMedia = window.matchMedia("(prefers-color-scheme: dark)");
+    const standaloneMode = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+    function applySystemTheme() {
+      const theme = prefersDarkMedia.matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-bs-theme", theme);
+    }
+
+    applySystemTheme();
+    if (typeof prefersDarkMedia.addEventListener === "function") {
+      prefersDarkMedia.addEventListener("change", applySystemTheme);
+    } else if (typeof prefersDarkMedia.addListener === "function") {
+      prefersDarkMedia.addListener(applySystemTheme);
+    }
+
+    if (standaloneMode) {
+      document.body.classList.add("standalone-mode");
+    }
 
     async function loadDataWithFallback() {
       const failures = [];
@@ -603,9 +652,14 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       "Topographic": L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
         maxZoom: 17,
         attribution: "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
+      }),
+      "Dark": L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 20,
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
       })
     };
-    baseLayers.OpenStreetMap.addTo(map);
+    const defaultLayerName = prefersDarkMedia.matches ? "Dark" : "OpenStreetMap";
+    baseLayers[defaultLayerName].addTo(map);
     map.setView([-41.2, 174.7], 5);
 
     const MapStyleControl = L.Control.extend({
@@ -626,7 +680,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
     const mapStyleSelect = document.getElementById("mapStyleSelect");
     if (mapStyleSelect) {
-      mapStyleSelect.value = "OpenStreetMap";
+      mapStyleSelect.value = defaultLayerName;
       mapStyleSelect.addEventListener("change", (event) => {
         const selected = event.target.value;
         Object.entries(baseLayers).forEach(([name, layer]) => {
