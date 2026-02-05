@@ -13,6 +13,9 @@ HTML-only (no API calls; regenerates ./rrf_map.html from existing JSON):
   python rrf_map.py
   python rrf_map.py --html-only
 
+Preview locally (recommended port for browser-container checks):
+  python -m http.server 4173
+
 Fetch + rebuild JSON/HTML (explicit, since HTML-only is default):
   python rrf_map.py --fetch
 
@@ -367,6 +370,44 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       border: 1px dashed rgba(0, 0, 0, 0.2);
       color: #212529;
       font-weight: 500;
+    }
+
+    .detail-section-title {
+      align-items: center;
+      display: flex;
+      font-size: 0.95rem;
+      font-weight: 700;
+      gap: 0.5rem;
+      letter-spacing: 0.01em;
+      margin-bottom: 0.85rem;
+    }
+
+    .detail-section-title::before {
+      background: linear-gradient(180deg, #0d6efd, #4ea1ff);
+      border-radius: 999px;
+      content: "";
+      display: inline-block;
+      height: 0.95rem;
+      width: 0.28rem;
+    }
+
+    .detail-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.9rem;
+    }
+
+    .detail-toolbar .btn {
+      border-radius: 999px;
+      font-weight: 600;
+      padding-inline: 0.8rem;
+    }
+
+    .detail-map-link {
+      border-radius: 999px;
+      font-weight: 500;
+      white-space: nowrap;
     }
   </style>
 </head>
@@ -843,6 +884,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     const recentList = document.getElementById("recentList");
     const coordWarn = document.getElementById("coordWarn");
     const recentSection = document.getElementById("recentSection");
+    const overviewSection = document.getElementById("overviewSection");
     const regionSection = document.getElementById("regionSection");
     const geoLocateBtn = document.getElementById("geoLocateBtn");
     const activeFilters = document.getElementById("activeFilters");
@@ -1181,6 +1223,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         detailCard.className = "text-secondary";
         detailCard.innerHTML = "Click a marker (or a recent item) to see details.";
         if (recentSection) recentSection.style.display = "";
+        if (overviewSection) overviewSection.style.display = "";
         if (regionSection) regionSection.style.display = "";
         if (carrierSection) carrierSection.style.display = "";
         if (bandSection) bandSection.style.display = "";
@@ -1188,6 +1231,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       }
 
       if (recentSection) recentSection.style.display = "none";
+      if (overviewSection) overviewSection.style.display = "none";
       if (regionSection) regionSection.style.display = "none";
       if (carrierSection) carrierSection.style.display = "none";
       if (bandSection) bandSection.style.display = "none";
@@ -1240,10 +1284,10 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         : "";
       const linkSection = hasCoords
         ? `
-          <div class="mt-2 d-flex flex-nowrap gap-2 overflow-auto">
-            <a class="btn btn-sm btn-outline-secondary" href="${googleSatelliteUrl}" target="_blank" rel="noreferrer">Satellite</a>
-            <a class="btn btn-sm btn-outline-secondary" href="${googleStreetUrl}" target="_blank" rel="noreferrer">Street</a>
-            <a class="btn btn-sm btn-outline-secondary" href="${linzUrl}" target="_blank" rel="noreferrer">Aerial</a>
+          <div class="mt-2 d-flex flex-nowrap gap-2 overflow-auto pb-1">
+            <a class="btn btn-sm btn-outline-secondary detail-map-link" href="${googleSatelliteUrl}" target="_blank" rel="noreferrer">Satellite</a>
+            <a class="btn btn-sm btn-outline-secondary detail-map-link" href="${googleStreetUrl}" target="_blank" rel="noreferrer">Street</a>
+            <a class="btn btn-sm btn-outline-secondary detail-map-link" href="${linzUrl}" target="_blank" rel="noreferrer">Aerial</a>
           </div>
         `
         : "";
@@ -1346,18 +1390,21 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       detailCard.innerHTML = `
         <div class="card border-0 shadow-sm">
           <div class="card-body">
-            <div class="d-flex align-items-start gap-3">
-              ${headerBadge}
+            <div class="d-flex align-items-start gap-3 justify-content-between flex-wrap">
               <div class="flex-grow-1">
+                <div class="detail-section-title">Site details</div>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <span class="badge rounded-pill text-bg-primary">${count} licence(s)</span>
+                  <span class="badge rounded-pill text-bg-light">${carrierCount} carrier(s)</span>
                   ${carrierSummary}
                 </div>
               </div>
+              ${headerBadge}
             </div>
 
-            <div class="mt-3 d-flex gap-2">
-              <button class="btn btn-sm btn-primary fw-semibold" id="clearDetailBtn" type="button">Back</button>
-              <button class="btn btn-sm btn-dark" id="zoomSiteBtn" type="button" ${first.lat && first.lon ? "" : "disabled"}>Zoom</button>
+            <div class="detail-toolbar">
+              <button class="btn btn-sm btn-outline-primary" id="clearDetailBtn" type="button">← Back to list</button>
+              <button class="btn btn-sm btn-primary" id="zoomSiteBtn" type="button" ${first.lat && first.lon ? "" : "disabled"}>Zoom to site</button>
             </div>
             ${linkSection}
           </div>
@@ -1988,7 +2035,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
 
   <div class="card">
     <div class="card-body">
-      <div class="fw-semibold mb-2">Details</div>
+      <div class="detail-section-title">Details</div>
       <div id="detailCard" class="text-secondary"></div>
     </div>
   </div>
@@ -2075,6 +2122,7 @@ def main() -> int:
 
         print(f"Read {args.json_in} ({len(data)} records)")
         print(f"Wrote {args.html_out}")
+        print("Tip: if Playwright/browser-container shows a generic 'Not Found' on port 8000, serve this folder on another port such as 4173.")
         return 0
 
     # Normal fetch path
