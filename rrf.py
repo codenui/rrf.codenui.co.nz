@@ -667,6 +667,25 @@ def build_html(data: List[Dict[str, Any]]) -> str:
       return `${rounded} km`;
     }
 
+    function getNearestLicencesForCarrier(lat, lon, carrierKey, excludedIds = new Set(), limit = 3) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+      const key = carrierKey || "unknown";
+      const candidates = nearestCandidatesByCarrier.get(key) || [];
+      if (!candidates.length) return [];
+
+      const origin = L.latLng(lat, lon);
+      const nearest = candidates
+        .filter(r => r && r._hasCoords && !excludedIds.has(String(r.id ?? "")))
+        .map(r => {
+          const target = L.latLng(r._lat, r._lon);
+          return { record: r, meters: origin.distanceTo(target) };
+        })
+        .sort((a, b) => a.meters - b.meters)
+        .slice(0, limit);
+
+      return nearest;
+    }
+
     function drawNearestCarrierLines(lat, lon) {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
       clearAddressLines();
@@ -1362,6 +1381,30 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         });
         const groupAccId = `${accId}_g_${groupIndex}`.replace(/[^a-zA-Z0-9_]/g, "_");
         const groupSiteLabel = safe(groupItems[0]?.location) || "Site";
+        const excludedIds = new Set(groupItems.map(item => String(item.id ?? "")));
+        const nearest = getNearestLicencesForCarrier(
+          lat,
+          lon,
+          group.carrierKey || groupItems[0]?.carrierKey,
+          excludedIds,
+          3
+        );
+        const nearestSection = nearest.length
+          ? `
+            <div class="border rounded p-2 bg-light-subtle mt-2">
+              <div class="fw-semibold small mb-1">Nearest licences (${nearest.length})</div>
+              <div class="small d-flex flex-column gap-1">
+                ${nearest.map(({ record, meters }) => `
+                  <div class="d-flex gap-2 align-items-center">
+                    <span class="text-secondary">${formatDistanceLabel(meters)}</span>
+                    <span class="text-truncate">${safe(record.location) || "Unknown site"}</span>
+                    <span class="ms-auto badge text-bg-light">${safe(record.licenceNo) || "—"}</span>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          `
+          : "";
         const totalBandwidthMHz = groupItems.reduce((sum, item) => {
           const bw = Number(item.bandwidthMHz);
           return Number.isFinite(bw) ? sum + bw : sum;
@@ -1381,6 +1424,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
               <div class="text-truncate">${groupSiteLabel}${nearbySuffix}</div>
               <span class="ms-auto badge text-bg-light">${groupItems.length} licence(s)</span>
             </div>
+            ${nearestSection}
             <div class="accordion" id="${groupAccId}">
               ${rows}
             </div>
