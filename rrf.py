@@ -1468,7 +1468,17 @@ def build_html(data: List[Dict[str, Any]]) -> str:
     }
 
     function renderRecentList(filtered) {
-      const sorted = [...filtered].sort((a, b) => {
+      const now = new Date();
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 7);
+
+      const recent = filtered.filter((r) => {
+        const commenced = parseISO(r.commencementDate);
+        if (!commenced) return false;
+        return commenced >= sevenDaysAgo && commenced <= now;
+      });
+
+      const sorted = [...recent].sort((a, b) => {
         const da = parseISO(a.commencementDate);
         const db = parseISO(b.commencementDate);
         const ta = da ? da.getTime() : -Infinity;
@@ -1476,10 +1486,9 @@ def build_html(data: List[Dict[str, Any]]) -> str:
         return tb - ta;
       });
 
-      const top = sorted.slice(0, 10);
       recentList.innerHTML = "";
 
-      top.forEach((r) => {
+      sorted.forEach((r) => {
         const div = document.createElement("button");
         div.type = "button";
         div.className = "list-group-item list-group-item-action";
@@ -1945,7 +1954,7 @@ def build_html(data: List[Dict[str, Any]]) -> str:
   <div class="card" id="recentSection">
     <div class="card-body">
       <div class="d-flex align-items-center justify-content-between mb-2 gap-2">
-        <div class="fw-semibold">10 most recent changes</div>
+        <div class="fw-semibold">New licences in the past 7 days</div>
         <button class="btn btn-sm btn-outline-primary" id="recentUpdateButton" type="button">Update</button>
       </div>
       <div class="list-group" id="recentList"></div>
