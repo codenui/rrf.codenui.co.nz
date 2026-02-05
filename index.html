@@ -279,16 +279,35 @@
   ></script>
 
   <script>
-    const DATA_URL = "./rrf_licences.json";
+    const DATA_URLS = [
+      "./rrf_licences.json",
+      "https://raw.githubusercontent.com/codenui/rrf.codenui.co.nz/refs/heads/main/rrf_licences.json",
+    ];
     const BAND_DEFS = [["b28", "LTE B28 (700)", [703, 803]], ["b5", "LTE B5 (850)", [824, 894]], ["b8", "LTE B8 (900)", [880, 960]], ["b3", "LTE B3 (1800)", [1710, 1880]], ["b1", "LTE/UMTS B1 (2100)", [1920, 2170]], ["b40", "LTE B40 (2300)", [2300, 2400]], ["b7", "LTE B7 (2600)", [2500, 2690]], ["n78", "NR n78 (3500)", [3300, 3800]], ["n258", "NR n258 (26GHz)", [24250, 27500]]]; // [code,label,[lo,hi]]
     let DATA = [];
 
-    async function init() {
-      const response = await fetch(DATA_URL, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`Failed to load data (${response.status}).`);
+    async function loadDataWithFallback() {
+      const failures = [];
+      for (const url of DATA_URLS) {
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) {
+            failures.push(`${url} -> HTTP ${response.status}`);
+            continue;
+          }
+          const rows = await response.json();
+          return { rows, url };
+        } catch (err) {
+          failures.push(`${url} -> ${err?.message || err}`);
+        }
       }
-      DATA = await response.json();
+      throw new Error(`Failed to load data. Tried: ${failures.join(" | ")}`);
+    }
+
+    async function init() {
+      const loaded = await loadDataWithFallback();
+      DATA = loaded.rows;
+      console.info(`Loaded ${DATA.length} records from ${loaded.url}`);
       DATA = DATA.filter(record => carrierKeyFromLicensee(record.licensee) !== "uber");
 
     // UI-only transforms (do not store in JSON)
@@ -1720,7 +1739,9 @@
 
   init().catch(err => {
     console.error("Failed to initialize page data:", err);
-    window.alert(err?.message || "Failed to load data.");
+    const message = err?.message || "Failed to load data.";
+    window.alert(`${message}
+Page URL: ${window.location.href}`);
   });
   </script>
 </body>
